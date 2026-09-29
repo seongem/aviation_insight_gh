@@ -1,0 +1,1676 @@
+{
+    "var_1107": {
+        "raw_name": "VAR_1107",
+        "units": "<UNITS>",
+        "rate": 0.25,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 6,
+        "group_name": "System / Metadata"
+    },
+    "var_2670": {
+        "raw_name": "VAR_2670",
+        "units": "<UNITS>",
+        "rate": 0.25,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 6,
+        "group_name": "System / Metadata"
+    },
+    "var_5107": {
+        "raw_name": "VAR_5107",
+        "units": "<UNITS>",
+        "rate": 0.25,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 6,
+        "group_name": "System / Metadata"
+    },
+    "var_6670": {
+        "raw_name": "VAR_6670",
+        "units": "<UNITS>",
+        "rate": 0.25,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 6,
+        "group_name": "System / Metadata"
+    },
+    "fpac": {
+        "raw_name": "FPAC",
+        "units": "G",
+        "rate": 16.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 1,
+        "group_name": "Dynamics"
+    },
+    "blac": {
+        "raw_name": "BLAC",
+        "units": "G",
+        "rate": 16.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 1,
+        "group_name": "Dynamics"
+    },
+    "ctac": {
+        "raw_name": "CTAC",
+        "units": "G",
+        "rate": 16.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 1,
+        "group_name": "Dynamics"
+    },
+    "th": {
+        "raw_name": "TH",
+        "units": "DEG",
+        "rate": 4.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 2,
+        "group_name": "Kinematics"
+    },
+    "mh": {
+        "raw_name": "MH",
+        "units": "DEG",
+        "rate": 4.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 2,
+        "group_name": "Kinematics"
+    },
+    "egt_1": {
+        "raw_name": "EGT_1",
+        "units": "DEG",
+        "rate": 4.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 4,
+        "group_name": "Propulsion"
+    },
+    "egt_2": {
+        "raw_name": "EGT_2",
+        "units": "DEG",
+        "rate": 4.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 4,
+        "group_name": "Propulsion"
+    },
+    "egt_3": {
+        "raw_name": "EGT_3",
+        "units": "DEG",
+        "rate": 4.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 4,
+        "group_name": "Propulsion"
+    },
+    "egt_4": {
+        "raw_name": "EGT_4",
+        "units": "DEG",
+        "rate": 4.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 4,
+        "group_name": "Propulsion"
+    },
+    "ivv": {
+        "raw_name": "IVV",
+        "units": "FT/MIN",
+        "rate": 16.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 2,
+        "group_name": "Kinematics"
+    },
+    "gs": {
+        "raw_name": "GS",
+        "units": "KNOTS",
+        "rate": 4.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 1,
+        "group_name": "Dynamics"
+    },
+    "trk": {
+        "raw_name": "TRK",
+        "units": "DEG",
+        "rate": 4.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 2,
+        "group_name": "Kinematics"
+    },
+    "trkm": {
+        "raw_name": "TRKM",
+        "units": "DEG",
+        "rate": 4.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 2,
+        "group_name": "Kinematics"
+    },
+    "da": {
+        "raw_name": "DA",
+        "units": "DEG",
+        "rate": 4.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 2,
+        "group_name": "Kinematics"
+    },
+    "povt": {
+        "raw_name": "POVT",
+        "units": "N/A",
+        "rate": 1.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 4,
+        "group_name": "Propulsion"
+    },
+    "ws": {
+        "raw_name": "WS",
+        "units": "KNOTS",
+        "rate": 4.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 2,
+        "group_name": "Kinematics"
+    },
+    "mw": {
+        "raw_name": "MW",
+        "units": "N/A",
+        "rate": 1.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 3,
+        "group_name": "Configuration"
+    },
+    "dfgs": {
+        "raw_name": "DFGS",
+        "units": "N/A",
+        "rate": 1.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 5,
+        "group_name": "Guidance"
+    },
+    "wd": {
+        "raw_name": "WD",
+        "units": "DEG",
+        "rate": 4.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 2,
+        "group_name": "Kinematics"
+    },
+    "alt": {
+        "raw_name": "ALT",
+        "units": "FEET",
+        "rate": 4.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 2,
+        "group_name": "Kinematics"
+    },
+    "nsqt": {
+        "raw_name": "NSQT",
+        "units": "N/A",
+        "rate": 4.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 3,
+        "group_name": "Configuration"
+    },
+    "ralt": {
+        "raw_name": "RALT",
+        "units": "FEET",
+        "rate": 8.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 2,
+        "group_name": "Kinematics"
+    },
+    "altr": {
+        "raw_name": "ALTR",
+        "units": "FT/MIN",
+        "rate": 4.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 2,
+        "group_name": "Kinematics"
+    },
+    "fqty_1": {
+        "raw_name": "FQTY_1",
+        "units": "LBS",
+        "rate": 1.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 4,
+        "group_name": "Propulsion"
+    },
+    "oit_1": {
+        "raw_name": "OIT_1",
+        "units": "DEG",
+        "rate": 1.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 4,
+        "group_name": "Propulsion"
+    },
+    "oit_2": {
+        "raw_name": "OIT_2",
+        "units": "DEG",
+        "rate": 1.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 4,
+        "group_name": "Propulsion"
+    },
+    "aoa1": {
+        "raw_name": "AOA1",
+        "units": "DEG",
+        "rate": 4.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 2,
+        "group_name": "Kinematics"
+    },
+    "aoa2": {
+        "raw_name": "AOA2",
+        "units": "DEG",
+        "rate": 4.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 2,
+        "group_name": "Kinematics"
+    },
+    "ptch": {
+        "raw_name": "PTCH",
+        "units": "DEG",
+        "rate": 8.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 2,
+        "group_name": "Kinematics"
+    },
+    "ff_1": {
+        "raw_name": "FF_1",
+        "units": "LBS/HR",
+        "rate": 4.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 4,
+        "group_name": "Propulsion"
+    },
+    "psa": {
+        "raw_name": "PSA",
+        "units": "MB",
+        "rate": 2.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 2,
+        "group_name": "Kinematics"
+    },
+    "ff_2": {
+        "raw_name": "FF_2",
+        "units": "LBS/HR",
+        "rate": 4.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 4,
+        "group_name": "Propulsion"
+    },
+    "ff_3": {
+        "raw_name": "FF_3",
+        "units": "LBS/HR",
+        "rate": 4.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 4,
+        "group_name": "Propulsion"
+    },
+    "roll": {
+        "raw_name": "ROLL",
+        "units": "DEG",
+        "rate": 8.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 2,
+        "group_name": "Kinematics"
+    },
+    "ff_4": {
+        "raw_name": "FF_4",
+        "units": "LBS/HR",
+        "rate": 4.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 4,
+        "group_name": "Propulsion"
+    },
+    "n1_1": {
+        "raw_name": "N1_1",
+        "units": "%RPM",
+        "rate": 4.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 4,
+        "group_name": "Propulsion"
+    },
+    "n1_2": {
+        "raw_name": "N1_2",
+        "units": "%RPM",
+        "rate": 4.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 4,
+        "group_name": "Propulsion"
+    },
+    "mach": {
+        "raw_name": "MACH",
+        "units": "MACH",
+        "rate": 4.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 2,
+        "group_name": "Kinematics"
+    },
+    "cas": {
+        "raw_name": "CAS",
+        "units": "KNOTS",
+        "rate": 4.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 2,
+        "group_name": "Kinematics"
+    },
+    "apfd": {
+        "raw_name": "APFD",
+        "units": "N/A",
+        "rate": 1.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 5,
+        "group_name": "Guidance"
+    },
+    "ph": {
+        "raw_name": "PH",
+        "units": "N/A",
+        "rate": 1.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 6,
+        "group_name": "System / Metadata"
+    },
+    "casm": {
+        "raw_name": "CASM",
+        "units": "KNOTS",
+        "rate": 4.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 2,
+        "group_name": "Kinematics"
+    },
+    "tas": {
+        "raw_name": "TAS",
+        "units": "KNOTS",
+        "rate": 4.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 2,
+        "group_name": "Kinematics"
+    },
+    "vrtg": {
+        "raw_name": "VRTG",
+        "units": "G",
+        "rate": 8.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 1,
+        "group_name": "Dynamics"
+    },
+    "latg": {
+        "raw_name": "LATG",
+        "units": "G",
+        "rate": 4.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 1,
+        "group_name": "Dynamics"
+    },
+    "pi": {
+        "raw_name": "PI",
+        "units": "MB",
+        "rate": 2.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 2,
+        "group_name": "Kinematics"
+    },
+    "ps": {
+        "raw_name": "PS",
+        "units": "IN",
+        "rate": 2.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 2,
+        "group_name": "Kinematics"
+    },
+    "n1_3": {
+        "raw_name": "N1_3",
+        "units": "%RPM",
+        "rate": 4.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 4,
+        "group_name": "Propulsion"
+    },
+    "evnt": {
+        "raw_name": "EVNT",
+        "units": "N/A",
+        "rate": 1.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 6,
+        "group_name": "System / Metadata"
+    },
+    "mrk": {
+        "raw_name": "MRK",
+        "units": "N/A",
+        "rate": 1.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 5,
+        "group_name": "Guidance"
+    },
+    "vib_1": {
+        "raw_name": "VIB_1",
+        "units": "IN/SEC",
+        "rate": 4.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 4,
+        "group_name": "Propulsion"
+    },
+    "pt": {
+        "raw_name": "PT",
+        "units": "MB",
+        "rate": 2.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 2,
+        "group_name": "Kinematics"
+    },
+    "vhf1": {
+        "raw_name": "VHF1",
+        "units": "N/A",
+        "rate": 1.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 5,
+        "group_name": "Guidance"
+    },
+    "vhf2": {
+        "raw_name": "VHF2",
+        "units": "N/A",
+        "rate": 1.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 5,
+        "group_name": "Guidance"
+    },
+    "lgdn": {
+        "raw_name": "LGDN",
+        "units": "N/A",
+        "rate": 1.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 3,
+        "group_name": "Configuration"
+    },
+    "lgup": {
+        "raw_name": "LGUP",
+        "units": "N/A",
+        "rate": 1.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 3,
+        "group_name": "Configuration"
+    },
+    "vib_2": {
+        "raw_name": "VIB_2",
+        "units": "IN/SEC",
+        "rate": 4.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 4,
+        "group_name": "Propulsion"
+    },
+    "vhf3": {
+        "raw_name": "VHF3",
+        "units": "N/A",
+        "rate": 1.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 5,
+        "group_name": "Guidance"
+    },
+    "push": {
+        "raw_name": "PUSH",
+        "units": "N/A",
+        "rate": 1.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 3,
+        "group_name": "Configuration"
+    },
+    "shkr": {
+        "raw_name": "SHKR",
+        "units": "N/A",
+        "rate": 2.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 3,
+        "group_name": "Configuration"
+    },
+    "msqt_2": {
+        "raw_name": "MSQT_2",
+        "units": "N/A",
+        "rate": 2.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 3,
+        "group_name": "Configuration"
+    },
+    "vib_3": {
+        "raw_name": "VIB_3",
+        "units": "IN/SEC",
+        "rate": 4.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 4,
+        "group_name": "Propulsion"
+    },
+    "long": {
+        "raw_name": "LONG",
+        "units": "G",
+        "rate": 4.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 1,
+        "group_name": "Dynamics"
+    },
+    "pla_1": {
+        "raw_name": "PLA_1",
+        "units": "DEG",
+        "rate": 4.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 3,
+        "group_name": "Configuration"
+    },
+    "n1_4": {
+        "raw_name": "N1_4",
+        "units": "%RPM",
+        "rate": 4.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 4,
+        "group_name": "Propulsion"
+    },
+    "hydy": {
+        "raw_name": "HYDY",
+        "units": "N/A",
+        "rate": 1.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 3,
+        "group_name": "Configuration"
+    },
+    "hydg": {
+        "raw_name": "HYDG",
+        "units": "N/A",
+        "rate": 1.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 3,
+        "group_name": "Configuration"
+    },
+    "smok": {
+        "raw_name": "SMOK",
+        "units": "N/A",
+        "rate": 1.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 3,
+        "group_name": "Configuration"
+    },
+    "calt": {
+        "raw_name": "CALT",
+        "units": "N/A",
+        "rate": 1.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 2,
+        "group_name": "Kinematics"
+    },
+    "vib_4": {
+        "raw_name": "VIB_4",
+        "units": "IN/SEC",
+        "rate": 4.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 4,
+        "group_name": "Propulsion"
+    },
+    "pla_2": {
+        "raw_name": "PLA_2",
+        "units": "DEG",
+        "rate": 4.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 3,
+        "group_name": "Configuration"
+    },
+    "pla_3": {
+        "raw_name": "PLA_3",
+        "units": "DEG",
+        "rate": 4.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 3,
+        "group_name": "Configuration"
+    },
+    "pla_4": {
+        "raw_name": "PLA_4",
+        "units": "DEG",
+        "rate": 4.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 3,
+        "group_name": "Configuration"
+    },
+    "gmt_hour": {
+        "raw_name": "GMT_HOUR",
+        "units": "HOUR",
+        "rate": 2.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 6,
+        "group_name": "System / Metadata"
+    },
+    "gmt_minute": {
+        "raw_name": "GMT_MINUTE",
+        "units": "MINUTE",
+        "rate": 2.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 6,
+        "group_name": "System / Metadata"
+    },
+    "gmt_sec": {
+        "raw_name": "GMT_SEC",
+        "units": "SECOND",
+        "rate": 2.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 6,
+        "group_name": "System / Metadata"
+    },
+    "acmt": {
+        "raw_name": "ACMT",
+        "units": "N/A",
+        "rate": 1.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 6,
+        "group_name": "System / Metadata"
+    },
+    "fqty_2": {
+        "raw_name": "FQTY_2",
+        "units": "LSB",
+        "rate": 1.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 4,
+        "group_name": "Propulsion"
+    },
+    "oit_3": {
+        "raw_name": "OIT_3",
+        "units": "DEG",
+        "rate": 1.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 4,
+        "group_name": "Propulsion"
+    },
+    "oit_4": {
+        "raw_name": "OIT_4",
+        "units": "DEG",
+        "rate": 1.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 4,
+        "group_name": "Propulsion"
+    },
+    "date_year": {
+        "raw_name": "DATE_YEAR",
+        "units": "YEAR",
+        "rate": 0.25,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 6,
+        "group_name": "System / Metadata"
+    },
+    "date_month": {
+        "raw_name": "DATE_MONTH",
+        "units": "MONTH",
+        "rate": 0.25,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 6,
+        "group_name": "System / Metadata"
+    },
+    "date_day": {
+        "raw_name": "DATE_DAY",
+        "units": "DAY",
+        "rate": 0.25,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 6,
+        "group_name": "System / Metadata"
+    },
+    "dver_1": {
+        "raw_name": "DVER_1",
+        "units": "N/A",
+        "rate": 0.25,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 6,
+        "group_name": "System / Metadata"
+    },
+    "acid": {
+        "raw_name": "ACID",
+        "units": "N/A",
+        "rate": 0.25,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 6,
+        "group_name": "System / Metadata"
+    },
+    "blv": {
+        "raw_name": "BLV",
+        "units": "N/A",
+        "rate": 1.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 3,
+        "group_name": "Configuration"
+    },
+    "eai": {
+        "raw_name": "EAI",
+        "units": "N/A",
+        "rate": 1.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 3,
+        "group_name": "Configuration"
+    },
+    "pack": {
+        "raw_name": "PACK",
+        "units": "N/A",
+        "rate": 1.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 3,
+        "group_name": "Configuration"
+    },
+    "aoai": {
+        "raw_name": "AOAI",
+        "units": "DEG",
+        "rate": 4.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 2,
+        "group_name": "Kinematics"
+    },
+    "aoac": {
+        "raw_name": "AOAC",
+        "units": "DEG",
+        "rate": 4.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 2,
+        "group_name": "Kinematics"
+    },
+    "bal1": {
+        "raw_name": "BAL1",
+        "units": "FEET",
+        "rate": 4.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 2,
+        "group_name": "Kinematics"
+    },
+    "apuf": {
+        "raw_name": "APUF",
+        "units": "N/A",
+        "rate": 2.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 3,
+        "group_name": "Configuration"
+    },
+    "tocw": {
+        "raw_name": "TOCW",
+        "units": "N/A",
+        "rate": 2.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 3,
+        "group_name": "Configuration"
+    },
+    "bal2": {
+        "raw_name": "BAL2",
+        "units": "FEET",
+        "rate": 4.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 2,
+        "group_name": "Kinematics"
+    },
+    "wshr": {
+        "raw_name": "WSHR",
+        "units": "N/A",
+        "rate": 1.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 3,
+        "group_name": "Configuration"
+    },
+    "wow": {
+        "raw_name": "WOW",
+        "units": "N/A",
+        "rate": 1.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 3,
+        "group_name": "Configuration"
+    },
+    "n2_1": {
+        "raw_name": "N2_1",
+        "units": "%RPM",
+        "rate": 4.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 4,
+        "group_name": "Propulsion"
+    },
+    "n2_2": {
+        "raw_name": "N2_2",
+        "units": "%RPM",
+        "rate": 4.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 4,
+        "group_name": "Propulsion"
+    },
+    "n2_3": {
+        "raw_name": "N2_3",
+        "units": "%RPM",
+        "rate": 4.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 4,
+        "group_name": "Propulsion"
+    },
+    "n2_4": {
+        "raw_name": "N2_4",
+        "units": "%RPM",
+        "rate": 4.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 4,
+        "group_name": "Propulsion"
+    },
+    "tat": {
+        "raw_name": "TAT",
+        "units": "DEG",
+        "rate": 1.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 2,
+        "group_name": "Kinematics"
+    },
+    "sat": {
+        "raw_name": "SAT",
+        "units": "DEG",
+        "rate": 1.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 2,
+        "group_name": "Kinematics"
+    },
+    "n1t": {
+        "raw_name": "N1T",
+        "units": "%RPM",
+        "rate": 4.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 5,
+        "group_name": "Guidance"
+    },
+    "n1c": {
+        "raw_name": "N1C",
+        "units": "%RPM",
+        "rate": 4.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 5,
+        "group_name": "Guidance"
+    },
+    "rudd": {
+        "raw_name": "RUDD",
+        "units": "DEG",
+        "rate": 2.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 3,
+        "group_name": "Configuration"
+    },
+    "fqty_3": {
+        "raw_name": "FQTY_3",
+        "units": "LSB",
+        "rate": 1.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 4,
+        "group_name": "Propulsion"
+    },
+    "oip_1": {
+        "raw_name": "OIP_1",
+        "units": "PSI",
+        "rate": 1.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 4,
+        "group_name": "Propulsion"
+    },
+    "oip_2": {
+        "raw_name": "OIP_2",
+        "units": "PSI",
+        "rate": 1.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 4,
+        "group_name": "Propulsion"
+    },
+    "fqty_4": {
+        "raw_name": "FQTY_4",
+        "units": "LSB",
+        "rate": 1.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 4,
+        "group_name": "Propulsion"
+    },
+    "crss": {
+        "raw_name": "CRSS",
+        "units": "DEG",
+        "rate": 1.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 5,
+        "group_name": "Guidance"
+    },
+    "hdgs": {
+        "raw_name": "HDGS",
+        "units": "DEG",
+        "rate": 1.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 5,
+        "group_name": "Guidance"
+    },
+    "alts": {
+        "raw_name": "ALTS",
+        "units": "FEET",
+        "rate": 1.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 2,
+        "group_name": "Kinematics"
+    },
+    "snap": {
+        "raw_name": "SNAP",
+        "units": "N/A",
+        "rate": 1.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 6,
+        "group_name": "System / Metadata"
+    },
+    "cass": {
+        "raw_name": "CASS",
+        "units": "KNOTS",
+        "rate": 1.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 2,
+        "group_name": "Kinematics"
+    },
+    "n1co": {
+        "raw_name": "N1CO",
+        "units": "N/A",
+        "rate": 1.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 5,
+        "group_name": "Guidance"
+    },
+    "vsps": {
+        "raw_name": "VSPS",
+        "units": "FT/MIN",
+        "rate": 1.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 5,
+        "group_name": "Guidance"
+    },
+    "mns": {
+        "raw_name": "MNS",
+        "units": "MMACH",
+        "rate": 1.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 5,
+        "group_name": "Guidance"
+    },
+    "msqt_1": {
+        "raw_name": "MSQT_1",
+        "units": "N/A",
+        "rate": 2.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 3,
+        "group_name": "Configuration"
+    },
+    "vmode": {
+        "raw_name": "VMODE",
+        "units": "N/A",
+        "rate": 1.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 5,
+        "group_name": "Guidance"
+    },
+    "lmod": {
+        "raw_name": "LMOD",
+        "units": "N/A",
+        "rate": 1.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 5,
+        "group_name": "Guidance"
+    },
+    "a_t": {
+        "raw_name": "A_T",
+        "units": "N/A",
+        "rate": 1.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 5,
+        "group_name": "Guidance"
+    },
+    "ccpc": {
+        "raw_name": "CCPC",
+        "units": "COUNTS",
+        "rate": 2.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 3,
+        "group_name": "Configuration"
+    },
+    "ccpf": {
+        "raw_name": "CCPF",
+        "units": "COUNTS",
+        "rate": 2.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 3,
+        "group_name": "Configuration"
+    },
+    "rudp": {
+        "raw_name": "RUDP",
+        "units": "COUNTS",
+        "rate": 2.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 3,
+        "group_name": "Configuration"
+    },
+    "cwpc": {
+        "raw_name": "CWPC",
+        "units": "COUNTS",
+        "rate": 2.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 3,
+        "group_name": "Configuration"
+    },
+    "cwpf": {
+        "raw_name": "CWPF",
+        "units": "COUNTS",
+        "rate": 2.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 3,
+        "group_name": "Configuration"
+    },
+    "oip_3": {
+        "raw_name": "OIP_3",
+        "units": "PSI",
+        "rate": 1.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 4,
+        "group_name": "Propulsion"
+    },
+    "oip_4": {
+        "raw_name": "OIP_4",
+        "units": "PSI",
+        "rate": 1.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 4,
+        "group_name": "Propulsion"
+    },
+    "loc": {
+        "raw_name": "LOC",
+        "units": "DDM",
+        "rate": 1.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 5,
+        "group_name": "Guidance"
+    },
+    "gls": {
+        "raw_name": "GLS",
+        "units": "DDM",
+        "rate": 1.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 5,
+        "group_name": "Guidance"
+    },
+    "lonp": {
+        "raw_name": "LONP",
+        "units": "DEG",
+        "rate": 1.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 2,
+        "group_name": "Kinematics"
+    },
+    "abrk": {
+        "raw_name": "ABRK",
+        "units": "DEG",
+        "rate": 1.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 3,
+        "group_name": "Configuration"
+    },
+    "ail_1": {
+        "raw_name": "AIL_1",
+        "units": "DEG",
+        "rate": 1.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 3,
+        "group_name": "Configuration"
+    },
+    "ail_2": {
+        "raw_name": "AIL_2",
+        "units": "DEG",
+        "rate": 1.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 3,
+        "group_name": "Configuration"
+    },
+    "spl_1": {
+        "raw_name": "SPL_1",
+        "units": "DEG",
+        "rate": 1.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 3,
+        "group_name": "Configuration"
+    },
+    "spl_2": {
+        "raw_name": "SPL_2",
+        "units": "DEG",
+        "rate": 1.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 3,
+        "group_name": "Configuration"
+    },
+    "esn_4": {
+        "raw_name": "ESN_4",
+        "units": "UNITS",
+        "rate": 0.25,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 4,
+        "group_name": "Propulsion"
+    },
+    "ecyc_1": {
+        "raw_name": "ECYC_1",
+        "units": "HOURS",
+        "rate": 0.25,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 4,
+        "group_name": "Propulsion"
+    },
+    "ecyc_2": {
+        "raw_name": "ECYC_2",
+        "units": "HOURS",
+        "rate": 0.25,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 4,
+        "group_name": "Propulsion"
+    },
+    "elev_1": {
+        "raw_name": "ELEV_1",
+        "units": "DEG",
+        "rate": 1.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 3,
+        "group_name": "Configuration"
+    },
+    "elev_2": {
+        "raw_name": "ELEV_2",
+        "units": "DEG",
+        "rate": 1.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 3,
+        "group_name": "Configuration"
+    },
+    "flap": {
+        "raw_name": "FLAP",
+        "units": "COUNTS",
+        "rate": 1.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 3,
+        "group_name": "Configuration"
+    },
+    "ptrm": {
+        "raw_name": "PTRM",
+        "units": "DEG",
+        "rate": 1.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 3,
+        "group_name": "Configuration"
+    },
+    "hf1": {
+        "raw_name": "HF1",
+        "units": "N/A",
+        "rate": 1.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 5,
+        "group_name": "Guidance"
+    },
+    "hf2": {
+        "raw_name": "HF2",
+        "units": "N/A",
+        "rate": 1.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 5,
+        "group_name": "Guidance"
+    },
+    "smkb": {
+        "raw_name": "SMKB",
+        "units": "N/A",
+        "rate": 1.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 3,
+        "group_name": "Configuration"
+    },
+    "sply": {
+        "raw_name": "SPLY",
+        "units": "N/A",
+        "rate": 1.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 3,
+        "group_name": "Configuration"
+    },
+    "splg": {
+        "raw_name": "SPLG",
+        "units": "N/A",
+        "rate": 1.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 3,
+        "group_name": "Configuration"
+    },
+    "frmc": {
+        "raw_name": "FRMC",
+        "units": "N/A",
+        "rate": 0.25,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 6,
+        "group_name": "System / Metadata"
+    },
+    "dver_2": {
+        "raw_name": "DVER_2",
+        "units": "N/A",
+        "rate": 0.25,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 6,
+        "group_name": "System / Metadata"
+    },
+    "esn_3": {
+        "raw_name": "ESN_3",
+        "units": "UNITS",
+        "rate": 0.25,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 4,
+        "group_name": "Propulsion"
+    },
+    "bpgr_1": {
+        "raw_name": "BPGR_1",
+        "units": "PSI",
+        "rate": 1.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 3,
+        "group_name": "Configuration"
+    },
+    "bpgr_2": {
+        "raw_name": "BPGR_2",
+        "units": "PSI",
+        "rate": 1.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 3,
+        "group_name": "Configuration"
+    },
+    "bpyr_1": {
+        "raw_name": "BPYR_1",
+        "units": "PSI",
+        "rate": 1.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 3,
+        "group_name": "Configuration"
+    },
+    "bpyr_2": {
+        "raw_name": "BPYR_2",
+        "units": "PSI",
+        "rate": 1.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 3,
+        "group_name": "Configuration"
+    },
+    "ecyc_3": {
+        "raw_name": "ECYC_3",
+        "units": "HOURS",
+        "rate": 0.25,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 4,
+        "group_name": "Propulsion"
+    },
+    "ecyc_4": {
+        "raw_name": "ECYC_4",
+        "units": "HOURS",
+        "rate": 0.25,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 4,
+        "group_name": "Propulsion"
+    },
+    "ehrs_1": {
+        "raw_name": "EHRS_1",
+        "units": "HOURS",
+        "rate": 0.25,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 4,
+        "group_name": "Propulsion"
+    },
+    "tcas": {
+        "raw_name": "TCAS",
+        "units": "N/A",
+        "rate": 1.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 5,
+        "group_name": "Guidance"
+    },
+    "gpws": {
+        "raw_name": "GPWS",
+        "units": "N/A",
+        "rate": 1.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 3,
+        "group_name": "Configuration"
+    },
+    "tmag": {
+        "raw_name": "TMAG",
+        "units": "N/A",
+        "rate": 1.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 2,
+        "group_name": "Kinematics"
+    },
+    "tai": {
+        "raw_name": "TAI",
+        "units": "N/A",
+        "rate": 1.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 3,
+        "group_name": "Configuration"
+    },
+    "wai_1": {
+        "raw_name": "WAI_1",
+        "units": "N/A",
+        "rate": 1.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 3,
+        "group_name": "Configuration"
+    },
+    "wai_2": {
+        "raw_name": "WAI_2",
+        "units": "N/A",
+        "rate": 1.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 3,
+        "group_name": "Configuration"
+    },
+    "dwpt": {
+        "raw_name": "DWPT",
+        "units": "N/A",
+        "rate": 1.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 5,
+        "group_name": "Guidance"
+    },
+    "oipl": {
+        "raw_name": "OIPL",
+        "units": "N/A",
+        "rate": 1.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 4,
+        "group_name": "Propulsion"
+    },
+    "fadf": {
+        "raw_name": "FADF",
+        "units": "N/A",
+        "rate": 1.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 4,
+        "group_name": "Propulsion"
+    },
+    "fads": {
+        "raw_name": "FADS",
+        "units": "N/A",
+        "rate": 1.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 4,
+        "group_name": "Propulsion"
+    },
+    "ehrs_4": {
+        "raw_name": "EHRS_4",
+        "units": "HOURS",
+        "rate": 0.25,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 4,
+        "group_name": "Propulsion"
+    },
+    "ehrs_3": {
+        "raw_name": "EHRS_3",
+        "units": "HOURS",
+        "rate": 0.25,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 4,
+        "group_name": "Propulsion"
+    },
+    "ehrs_2": {
+        "raw_name": "EHRS_2",
+        "units": "HOURS",
+        "rate": 0.25,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 4,
+        "group_name": "Propulsion"
+    },
+    "tmode": {
+        "raw_name": "TMODE",
+        "units": "N/A",
+        "rate": 1.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 5,
+        "group_name": "Guidance"
+    },
+    "aten": {
+        "raw_name": "ATEN",
+        "units": "N/A",
+        "rate": 1.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 5,
+        "group_name": "Guidance"
+    },
+    "latp": {
+        "raw_name": "LATP",
+        "units": "DEG",
+        "rate": 1.0,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 2,
+        "group_name": "Kinematics"
+    },
+    "fire_1": {
+        "raw_name": "FIRE_1",
+        "units": "N/A",
+        "rate": 1.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 3,
+        "group_name": "Configuration"
+    },
+    "fire_2": {
+        "raw_name": "FIRE_2",
+        "units": "N/A",
+        "rate": 1.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 3,
+        "group_name": "Configuration"
+    },
+    "fire_3": {
+        "raw_name": "FIRE_3",
+        "units": "N/A",
+        "rate": 1.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 3,
+        "group_name": "Configuration"
+    },
+    "fire_4": {
+        "raw_name": "FIRE_4",
+        "units": "N/A",
+        "rate": 1.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 3,
+        "group_name": "Configuration"
+    },
+    "fgc3": {
+        "raw_name": "FGC3",
+        "units": "N/A",
+        "rate": 1.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 5,
+        "group_name": "Guidance"
+    },
+    "ilsf": {
+        "raw_name": "ILSF",
+        "units": "N/A",
+        "rate": 1.0,
+        "is_discrete": true,
+        "dtype": "uint32",
+        "group_id": 5,
+        "group_name": "Guidance"
+    },
+    "esn_1": {
+        "raw_name": "ESN_1",
+        "units": "UNITS",
+        "rate": 0.25,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 4,
+        "group_name": "Propulsion"
+    },
+    "esn_2": {
+        "raw_name": "ESN_2",
+        "units": "UNITS",
+        "rate": 0.25,
+        "is_discrete": false,
+        "dtype": "float32",
+        "group_id": 4,
+        "group_name": "Propulsion"
+    }
+}

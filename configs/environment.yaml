@@ -1,0 +1,26 @@
+# configs/config.yaml
+
+# Target environment override ("auto", "local_dev", "local_prod", or "colab")
+active_environment: auto
+
+environments:
+  local_dev:
+    IS_COLAB: false
+    ROOT_BASE_DIR: "/home/ram/aviation_insight"
+    DATABASE_DIR: "/mnt/fast_storage/projects/aviation_insight/github_examples/dashlink-anomaly-data/dataset"  # Or your primary raw dataset mount
+    CHECKPOINT_DIR: "/mnt/nvme4tb/checkpoints/local_dev"
+    OUTPUT_DIR: "/mnt/fast_storage/projects/aviation_insight/github_examples/dashlink-anomaly-data/outputs/local_dev"
+
+  local_prod:
+    IS_COLAB: false
+    ROOT_BASE_DIR: "/mnt/nvme4tb/aviation_insight_gh"
+    DATABASE_DIR: "/mnt/nvme4tb/datasets"
+    CHECKPOINT_DIR: "/mnt/nvme4tb/checkpoints/local_prod"
+    OUTPUT_DIR: "/mnt/nvme4tb/outputs/local_prod"
+
+  colab:
+    IS_COLAB: true
+    ROOT_BASE_DIR: "/content/aviation_insight_gh"
+    DATABASE_DIR: "/content/drive/MyDrive/aviation_data" # Or Google Drive / GCS mount
+    CHECKPOINT_DIR: "/content/checkpoints/colab"
+    OUTPUT_DIR: "/content/outputs/colab"
