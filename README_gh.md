@@ -13,7 +13,7 @@ If you use any of this work in academic papers or other studies, please use the 
 
 ## Reference papers
 
-- [Flight Phase Identification and Other Topics] paper(reports/papers/Flight%20Phase%20Identification.pdf) (see reports/papers)
+- [Flight Phase Identification and Other Topics](reports/papers/Flight%20Phase%20Identification.pdf) paper (see reports/papers)
 
 ## 📂 Project Structure
 
