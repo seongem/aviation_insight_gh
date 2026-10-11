@@ -11,9 +11,9 @@ the analysis.
 If you use any of this work in academic papers or other studies, please use the following citation:
 **TBD**
 
-## Reference material
+## Reference papers
 
-- Flight Phase Identification and Other Topics (see reports/)
+- [Flight Phase Identification and Other Topics] paper(reports/papers/Flight%20Phase%20Identification.pdf) (see reports/papers)
 
 ## 📂 Project Structure
 
