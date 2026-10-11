@@ -268,7 +268,7 @@ def plot_top_flights_dual_attribution(
         ax.legend(loc="upper left", fontsize=8, ncol=2)
         ax.grid(True, linestyle=":", alpha=0.5)
 
-    fig.suptitle(f"Diagnostic Diagnostic Plot - {title_suffix}", fontsize=14, fontweight="bold", y=1.01)
+    fig.suptitle(f"{title_suffix}", fontsize=14, fontweight="bold", y=1.01)
     plt.tight_layout()
     return fig
 
@@ -497,7 +497,7 @@ def visualize_and_save_top_anomalies(
         fig_anom = plot_top_flights_dual_attribution(
             flight_results=flight_anom_results,
             channel_names_dict=feature_names if isinstance(feature_names, dict) else None,
-            title_suffix=f"{model_name} - Top Anomalies",
+            title_suffix=f"{model_name} - Top Anomalies - {run_identifier}",
         )
         save_path_anom = os.path.join(output_dir, f"top_anomalies_{clean_model_tag}_{run_identifier}.png")
         fig_anom.savefig(save_path_anom, dpi=300, bbox_inches="tight")
@@ -509,7 +509,7 @@ def visualize_and_save_top_anomalies(
             fig_nom = plot_top_flights_dual_attribution(
                 flight_results=flight_nom_results,
                 channel_names_dict=feature_names if isinstance(feature_names, dict) else None,
-                title_suffix=f"{model_name} - Nominal Controls",
+                title_suffix=f"{model_name} - Nominal Controls - {run_identifier}",
             )
             save_path_nom = os.path.join(output_dir, f"nominal_controls_{clean_model_tag}_{run_identifier}.png")
             fig_nom.savefig(save_path_nom, dpi=300, bbox_inches="tight")

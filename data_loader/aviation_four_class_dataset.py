@@ -37,6 +37,7 @@ class AviationFourClassDataset(Dataset):
         phase_filter: int | None = 6,
         parquet_filename: str = "four_class_derived_dataset.parquet",
         sigma_clip: float | None = 5.0,
+        zero_pad_to_baseline: bool = False, # zero-shot inference
     ):
         self.manifest_dir = Path(manifest_dir)
         self.database_dir = Path(database_dir)
@@ -45,13 +46,24 @@ class AviationFourClassDataset(Dataset):
         self.stride = stride
         self.phase_filter = phase_filter
         self.sigma_clip = sigma_clip
+        self.zero_pad_to_baseline = zero_pad_to_baseline
 
         # 1. Load Feature Registry & Determine Active Channels via features.csv
         self.features_df = pd.read_csv(self.manifest_dir / "features.csv")
 
-        active_mask = self.features_df[feature_set] == True
-        if logo_mask_col and logo_mask_col in self.features_df.columns:
-            active_mask = active_mask & (self.features_df[logo_mask_col] == True)
+        baseline_mask = self.features_df["enabled_baseline"] == True
+        self.baseline_feature_names = self.features_df[baseline_mask]["feature_name"].tolist()
+
+        if self.zero_pad_to_baseline:
+            if feature_set != "enabled_baseline":
+                raise ValueError(
+                    f"zero_pad_to_baseline=True requires feature_set='enabled_baseline', got '{feature_set}'"
+                )
+            active_mask = baseline_mask
+        else:
+            active_mask = self.features_df[feature_set] == True
+            if logo_mask_col and logo_mask_col in self.features_df.columns:
+                active_mask = active_mask & (self.features_df[logo_mask_col] == True)
 
         self.active_features_df = self.features_df[active_mask].reset_index(drop=True)
         self.feature_names = self.active_features_df["feature_name"].tolist()
@@ -127,14 +139,25 @@ class AviationFourClassDataset(Dataset):
 
         # Extract 1D array sequences for each active feature and stack into [160, C]
         sequence_channels = [self.channel_columns[ch_idx][idx] for ch_idx in range(self.num_channels)]
-        sequence_matrix = np.column_stack(sequence_channels).astype(np.float32)  # Shape: [160, C]
-
-        # Convert to Tensor [1, T, C]
-        tensor_window = torch.from_numpy(sequence_matrix).unsqueeze(0)
+        sequence_matrix = np.column_stack(sequence_channels).astype(np.float32)  # Shape: [160, C]        
+        tensor_window = torch.from_numpy(sequence_matrix).unsqueeze(0)  # Convert to Tensor [1, T, C]
 
         # Apply Z-score normalization: (X - mu) / sigma
         normalized_window = (tensor_window - self.means) / self.stds
         normalized_window = normalized_window.squeeze(0)  # Shape: [T, C]
+
+        # Zero-pad dropped channels back to full baseline dimension if zero-shot evaluating
+        if self.zero_pad_to_baseline and self.drop_indices:
+            full_channels = len(self.baseline_feature_names)
+            padded_window = torch.zeros((normalized_window.size(0), full_channels), dtype=torch.float32)
+            
+            active_col_idx = 0
+            for baseline_idx, feat_name in enumerate(self.baseline_feature_names):
+                if baseline_idx not in self.drop_indices:
+                    padded_window[:, baseline_idx] = normalized_window[:, active_col_idx]
+                    active_col_idx += 1
+            
+            normalized_window = padded_window
 
         # Metadata tuple matching production evaluator
         metadata = {
@@ -177,13 +200,26 @@ class AviationFourClassDataset(Dataset):
         else:
             raise ValueError(f"Unknown target_type '{target_type}'. Expected 'binary' or 'multiclass'.")
 
-    def get_nominal_subset(self) -> torch.utils.data.Subset:
+    def get_nominal_subset(self, fraction: float = 1.0, seed: int = 42) -> torch.utils.data.Subset:
         """
         Returns a PyTorch Subset containing strictly nominal instances (label == 0)
         for unsupervised model training (e.g., PatchTST, OmniAnomaly, TS2Vec).
         """
         nominal_indices = [idx for idx, label in enumerate(self.labels) if label == 0]
-        return torch.utils.data.Subset(self, nominal_indices)
+        subset = torch.utils.data.Subset(self, nominal_indices)
+
+        # 2. Apply fractional sub-sampling if fraction < 1.0
+        if fraction < 1.0:
+            subset_size = int(len(subset) * fraction)
+            remaining_size = len(subset) - subset_size
+            generator = torch.Generator().manual_seed(seed)
+            subset, _ = torch.utils.data.random_split(
+                subset, 
+                [subset_size, remaining_size], 
+                generator=generator
+            )
+        
+        return subset
     
     def get_feature_names(self) -> list[str]:
         """Returns the active list of feature/sensor names aligned with the channel dimensions [C]."""

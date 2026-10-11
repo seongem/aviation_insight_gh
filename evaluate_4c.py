@@ -1,3 +1,4 @@
+import argparse
 import os
 import sys
 import yaml
@@ -55,8 +56,8 @@ def evaluate_unsupervised_model(
     Stage B: Benchmarks Test set using static calibrated tau and extracts full diagnostic reports.
     """
     # Stage A: Calibrate threshold tau on validation split
-    val_metrics = evaluator.get_metrics(val_loader, auto_percentile=percentile)
-    tau_calibrated = val_metrics["Calibrated_Tau"]
+    val_metrics = evaluator.get_metrics(val_loader, auto_percentile=percentile, threshold_strategy="optimal")
+    tau_calibrated = val_metrics["Optimal_Tau"]
 
     # Stage B: Full evaluation on test set using calibrated tau
     test_metrics = evaluator.get_metrics(
@@ -264,25 +265,46 @@ def load_checkpoint_metrics_json(ckpt_dir: Path, filename: str = "best_model_met
 # 4. Main Execution Routine
 # -------------------------------------------------------------------------
 def main():
+
+    parser = argparse.ArgumentParser(
+        description="Aviation Flight Data Anomaly Detection Pipeline Execution Engine"
+    )
+
+    parser.add_argument(
+        "--config",
+        type=str,
+        default="configs/experiments_features.yaml",
+        help="Path to experiment configuration YAML file",
+    )
+
+    args = parser.parse_args()
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     logger.info("Initializing Evaluation Engine on Device: %s", device)
 
     # Load Environment
     env = LoadEnvironment()
     checkpoint_dir = Path(env.CHECKPOINT_DIR)
-    plots_dir = os.path.join(env.OUTPUT_DIR, "evaluation_plots")
+
 
     # Load experiment configuration YAML
-    config_path = os.path.join(env.ROOT_BASE_DIR, "configs", "experiments.yaml")
+    config_path = os.path.join(env.ROOT_BASE_DIR, args.config)
 
     logger.info("Loading Experiment Config from: %s", config_path)
     with open(config_path, "r") as f:
         exp_cfg = yaml.safe_load(f)
 
+    experiment_tag = exp_cfg.get("experiment_tag", "standard_evaluation")
+    plots_dir = os.path.join(env.OUTPUT_DIR, "evaluation_plots", experiment_tag)
+
     percentile_tau = exp_cfg.get("evaluation", {}).get("percentile", 95.0)
     feature_masks = exp_cfg.get("feature_masks", ["enabled_all"])
+    data_fractions = exp_cfg.get("data_fractions", [1.0])
     batch_size = exp_cfg.get("defaults", {}).get("batch_size", 512)
     num_workers = exp_cfg.get("defaults", {}).get("num_workers", 4)
+
+    if not isinstance(data_fractions, list):
+            data_fractions = [data_fractions]
 
     all_mask_summary_rows = []
 
@@ -298,276 +320,292 @@ def main():
     for mask_name in feature_masks:
         for train_logo in train_logo_masks:
             train_logo_tag = f"_logo_{train_logo}" if train_logo else ""
-            model_ckpt_dir = f"{mask_name}{train_logo_tag}"
 
-            for inf_logo in inf_logo_masks:
-                test_logo_tag = f"_testlogo_{inf_logo}" if inf_logo else ""
-                run_identifier = f"{model_ckpt_dir}{test_logo_tag}"
+            for fraction in data_fractions:
+                frac_tag = f"_frac_{int(fraction * 100)}" if fraction < 1.0 else ""
+                model_ckpt_dir = f"{mask_name}{train_logo_tag}{frac_tag}"                
 
-                logger.info(
-                    f"\n=== EVAL | Feature Set: {mask_name} | Train LOGO: {train_logo or 'NONE'} | Test LOGO: {inf_logo or 'NONE'} ==="
-                )
-
-                # 1. Validation Dataset (Used exclusively to calibrate Tau / threshold)
-                val_ds = AviationFourClassDataset(
-                    manifest_dir=env.DATABASE_DIR / "manifests",
-                    database_dir=env.DATABASE_DIR,
-                    stats_path=env.DATABASE_DIR / "metadata" / "train_split_stats.json",
-                    split="val",
-                    feature_set=mask_name,
-                    logo_mask_col=inf_logo,
-                )
-
-                # 2. Test Dataset (Used for final benchmark evaluation)
-                test_ds = AviationFourClassDataset(
-                    manifest_dir=env.DATABASE_DIR / "manifests",
-                    database_dir=env.DATABASE_DIR,
-                    stats_path=env.DATABASE_DIR / "metadata" / "train_split_stats.json",
-                    split="test",
-                    feature_set=mask_name,
-                    logo_mask_col=inf_logo,
-                )
-
-                # 3. Train Dataset (Used for TS2Vec kNN for memory bank)
-                train_ds = AviationFourClassDataset(
-                    manifest_dir=env.DATABASE_DIR / "manifests",
-                    database_dir=env.DATABASE_DIR,
-                    stats_path=env.DATABASE_DIR / "metadata" / "train_split_stats.json",
-                    split="train",
-                    feature_set=mask_name,
-                    logo_mask_col=inf_logo,
-                )
-
-                val_loader = DataLoader(
-                    val_ds,
-                    batch_size=batch_size,
-                    shuffle=False,
-                    num_workers=num_workers,
-                    pin_memory=True,
-                )
-                test_loader = DataLoader(
-                    test_ds,
-                    batch_size=batch_size,
-                    shuffle=False,
-                    num_workers=num_workers,
-                    pin_memory=True,
-                )
-                train_loader = DataLoader(
-                    train_ds,
-                    batch_size=batch_size,
-                    shuffle=False,
-                    num_workers=num_workers,
-                    pin_memory=True,
-                )
-
-                in_channels = val_ds.num_channels
-                seq_len = val_ds.window_size
-                input_shape = (seq_len, in_channels)
-
-                logger.info(
-                    f"Verified Dataset | Mask: {mask_name} | Channels: {in_channels} | Window Size: {seq_len}"
-                )
-
-                m_cfg = exp_cfg.get("models", {})
-
-                patch_len = m_cfg.get("patchtst", {}).get("patch_len", 16)
-                stride = m_cfg.get("patchtst", {}).get("stride", 8)
-                num_patch = (seq_len - patch_len) // stride + 1
-
-                models_config = {
-                    "TS2Vec (Masking Drift)": {
-                        "model_cls": TSEncoder,
-                        "kwargs": {
-                            "input_dims": in_channels,
-                            "output_dims": m_cfg.get("ts2vec", {}).get("output_dims", 320),
-                            "hidden_dims": m_cfg.get("ts2vec", {}).get("hidden_dims", 64),
-                            "depth": m_cfg.get("ts2vec", {}).get("depth", 10),
-                        },
-                        "ckpt_base": "ts2vec",
-                        "type": "ts2vec",
-                    },
-                    "TS2Vec (kNN-Memory Bank)": {
-                        "model_cls": TSEncoder,
-                        "kwargs": {
-                            "input_dims": in_channels,
-                            "output_dims": m_cfg.get("ts2vec", {}).get("output_dims", 320),
-                            "hidden_dims": m_cfg.get("ts2vec", {}).get("hidden_dims", 64),
-                            "depth": m_cfg.get("ts2vec", {}).get("depth", 10),
-                        },
-                        "ckpt_base": "ts2vec",
-                        "type": "ts2vec_knn",
-                    },
-                    "LSTM-VAE": {
-                        "model_cls": LSTMVAE,
-                        "kwargs": {
-                            "input_dim": in_channels,
-                            "hidden_dim": m_cfg.get("lstm_vae", {}).get("hidden_dim", 128),
-                            "latent_dim": m_cfg.get("lstm_vae", {}).get("latent_dim", 32),
-                            "num_layers": m_cfg.get("lstm_vae", {}).get("num_layers", 2),
-                            "dropout": m_cfg.get("lstm_vae", {}).get("dropout", 0.1),
-                        },
-                        "ckpt_base": "lstm_vae",
-                        "type": "lstm_vae",
-                    },
-                    "OmniAnomaly": {
-                        "model_cls": OmniAnomaly,
-                        "kwargs": {
-                            "n_features": in_channels,
-                            "window_size": seq_len,
-                            "latent_dim": m_cfg.get("omni", {}).get("latent_dim", 32),
-                            "rnn_hidden": m_cfg.get("omni", {}).get("rnn_hidden", 128),
-                        },
-                        "ckpt_base": "omni",
-                        "type": "omni",
-                    },
-                    "ConvAutoencoder": {
-                        "model_cls": ConvAutoencoder,
-                        "kwargs": {
-                            "input_shape": input_shape,
-                        },
-                        "ckpt_base": "conv_ae",
-                        "type": "conv_ae",
-                    },
-                    "PatchTST": {
-                        "model_cls": PatchTST,
-                        "kwargs": {
-                            "c_in": in_channels,
-                            "target_dim": seq_len,
-                            "patch_len": patch_len,
-                            "stride": stride,
-                            "num_patch": num_patch,
-                            "head_type": "pretrain",
-                            "d_model": m_cfg.get("patchtst", {}).get("d_model", 64),
-                            "n_layers": m_cfg.get("patchtst", {}).get("e_layers", 3),
-                            "n_heads": m_cfg.get("patchtst", {}).get("n_heads", 4),
-                            "dropout": m_cfg.get("patchtst", {}).get("dropout", 0.1),
-                            "attn_dropout": m_cfg.get("patchtst", {}).get("attn_dropout", 0.1),
-                            "head_dropout": m_cfg.get("patchtst", {}).get("head_dropout", 0.2),
-                        },
-                        "ckpt_base": "patchtst",
-                        "type": "patchtst",
-                    },
-                    "Anomaly Transformer": {
-                        "model_cls": AnomalyTransformer,
-                        "kwargs": {
-                            "win_size": seq_len,
-                            "enc_in": in_channels,
-                            "c_out": in_channels,
-                            "d_model": m_cfg.get("anomaly_transformer", {}).get("d_model", 128),
-                            "n_heads": m_cfg.get("anomaly_transformer", {}).get("n_heads", 8),
-                            "e_layers": m_cfg.get("anomaly_transformer", {}).get("e_layers", 3),
-                            "d_ff": m_cfg.get("anomaly_transformer", {}).get("d_ff", 256),
-                            "dropout": m_cfg.get("anomaly_transformer", {}).get("dropout", 0.1),
-                        },
-                        "ckpt_base": "anomaly_transformer",
-                        "type": "anomaly_transformer",
-                    },
-                }
-
-                mask_results = {}
-
-                # Iterative Model Benchmarking
-                for model_name, cfg in models_config.items():
-                    target_dir = checkpoint_dir / f"{cfg['ckpt_base']}_{model_ckpt_dir}"
-                    mask_ckpt_path = target_dir / "best_model.pt"
-                    base_ckpt_path = checkpoint_dir / f"{cfg['ckpt_base']}.pt"
-
-                    if mask_ckpt_path.exists():
-                        ckpt_path = mask_ckpt_path
-                        run_dir = target_dir
-                    elif base_ckpt_path.exists():
-                        ckpt_path = base_ckpt_path
-                        run_dir = checkpoint_dir
-                    else:
-                        logger.warning(
-                            "Checkpoint for %s [%s] not found at %s or %s. Skipping...",
-                            model_name,
-                            mask_name,
-                            mask_ckpt_path,
-                            base_ckpt_path,
-                        )
+                for inf_logo in inf_logo_masks:
+                    
+                    # Enforce matching train/inference pairs for Ablation, ALLOW mismatched for Zero-Shot
+                    is_zero_shot = (train_logo is None) and (inf_logo is not None)
+                    if train_logo is not None and train_logo != inf_logo:
                         continue
 
-                    logger.info("Loading Checkpoint for %s [%s]: %s", model_name, mask_name, ckpt_path)
+                    test_logo_tag = f"_testlogo_{inf_logo}" if inf_logo else ""
+                    run_identifier = f"{model_ckpt_dir}{test_logo_tag}"
 
-                    model = cfg["model_cls"](**cfg["kwargs"]).to(device)
-                    state_dict, raw_ckpt = load_clean_state_dict(ckpt_path, device)
-                    model.load_state_dict(state_dict)
-                    model.eval()
+                    logger.info(
+                        f"\n=== EVAL | Feature Set: {mask_name} | Train LOGO: {train_logo or 'NONE'} | Test LOGO: {inf_logo or 'NONE'} ==="
+                    )
 
-                    # Read companion JSON metrics if available
-                    json_metrics = load_checkpoint_metrics_json(run_dir, "best_model_metrics.json")
+                    # 1. Validation Dataset (Used exclusively to calibrate Tau / threshold)
+                    val_ds = AviationFourClassDataset(
+                        manifest_dir=env.DATABASE_DIR / "manifests",
+                        database_dir=env.DATABASE_DIR,
+                        stats_path=env.DATABASE_DIR / "metadata" / "train_split_stats.json",
+                        split="val",
+                        feature_set=mask_name,
+                        logo_mask_col=inf_logo,
+                    )
 
-                    # Fall back to checkpoint dictionary if JSON isn't present
-                    ckpt_comp = raw_ckpt.get("computational_metrics", {}) if isinstance(raw_ckpt, dict) else {}
+                    # In evaluate_4c.py during test dataset instantiation for robustness check:
+                    is_zero_shot = (train_logo is None) and (inf_logo is not None)
 
-                    feature_names = test_ds.get_feature_names()
-                    metadata_df = test_ds.get_metadata()
+                    # 2. Test Dataset (Used for final benchmark evaluation)
+                    test_ds = AviationFourClassDataset(
+                        manifest_dir=env.DATABASE_DIR / "manifests",
+                        database_dir=env.DATABASE_DIR,
+                        stats_path=env.DATABASE_DIR / "metadata" / "train_split_stats.json",
+                        split="test",
+                        feature_set=mask_name,
+                        logo_mask_col=inf_logo,
+                        zero_pad_to_baseline=is_zero_shot,
+                    )
 
-                    evaluator_kwargs = {
-                        "model": model,
-                        "model_type": cfg["type"],
-                        "device": device.type,
-                        "feature_names": feature_names,
-                        "metadata_df": metadata_df,
+                    # 3. Train Dataset (Used for TS2Vec kNN for memory bank)
+                    train_ds = AviationFourClassDataset(
+                        manifest_dir=env.DATABASE_DIR / "manifests",
+                        database_dir=env.DATABASE_DIR,
+                        stats_path=env.DATABASE_DIR / "metadata" / "train_split_stats.json",
+                        split="train",
+                        feature_set=mask_name,
+                        logo_mask_col=inf_logo,
+                    )
+
+                    val_loader = DataLoader(
+                        val_ds,
+                        batch_size=batch_size,
+                        shuffle=False,
+                        num_workers=num_workers,
+                        pin_memory=True,
+                    )
+                    test_loader = DataLoader(
+                        test_ds,
+                        batch_size=batch_size,
+                        shuffle=False,
+                        num_workers=num_workers,
+                        pin_memory=True,
+                    )
+                    train_loader = DataLoader(
+                        train_ds,
+                        batch_size=batch_size,
+                        shuffle=False,
+                        num_workers=num_workers,
+                        pin_memory=True,
+                    )
+
+                    in_channels = val_ds.num_channels
+                    seq_len = val_ds.window_size
+                    input_shape = (seq_len, in_channels)
+
+                    logger.info(
+                        f"Verified Dataset | Mask: {mask_name} | Channels: {in_channels} | Window Size: {seq_len}"
+                    )
+
+                    m_cfg = exp_cfg.get("models", {})
+
+                    patch_len = m_cfg.get("patchtst", {}).get("patch_len", 16)
+                    stride = m_cfg.get("patchtst", {}).get("stride", 8)
+                    num_patch = (seq_len - patch_len) // stride + 1
+
+                    models_config = {
+                        "TS2Vec (Masking Drift)": {
+                            "model_cls": TSEncoder,
+                            "kwargs": {
+                                "input_dims": in_channels,
+                                "output_dims": m_cfg.get("ts2vec", {}).get("output_dims", 320),
+                                "hidden_dims": m_cfg.get("ts2vec", {}).get("hidden_dims", 64),
+                                "depth": m_cfg.get("ts2vec", {}).get("depth", 10),
+                            },
+                            "ckpt_base": "ts2vec",
+                            "type": "ts2vec",
+                        },
+                        "TS2Vec (kNN-Memory Bank)": {
+                            "model_cls": TSEncoder,
+                            "kwargs": {
+                                "input_dims": in_channels,
+                                "output_dims": m_cfg.get("ts2vec", {}).get("output_dims", 320),
+                                "hidden_dims": m_cfg.get("ts2vec", {}).get("hidden_dims", 64),
+                                "depth": m_cfg.get("ts2vec", {}).get("depth", 10),
+                            },
+                            "ckpt_base": "ts2vec",
+                            "type": "ts2vec_knn",
+                        },
+                        "LSTM-VAE": {
+                            "model_cls": LSTMVAE,
+                            "kwargs": {
+                                "input_dim": in_channels,
+                                "hidden_dim": m_cfg.get("lstm_vae", {}).get("hidden_dim", 128),
+                                "latent_dim": m_cfg.get("lstm_vae", {}).get("latent_dim", 32),
+                                "num_layers": m_cfg.get("lstm_vae", {}).get("num_layers", 2),
+                                "dropout": m_cfg.get("lstm_vae", {}).get("dropout", 0.1),
+                            },
+                            "ckpt_base": "lstm_vae",
+                            "type": "lstm_vae",
+                        },
+                        "OmniAnomaly": {
+                            "model_cls": OmniAnomaly,
+                            "kwargs": {
+                                "n_features": in_channels,
+                                "window_size": seq_len,
+                                "latent_dim": m_cfg.get("omni", {}).get("latent_dim", 32),
+                                "rnn_hidden": m_cfg.get("omni", {}).get("rnn_hidden", 128),
+                            },
+                            "ckpt_base": "omni",
+                            "type": "omni",
+                        },
+                        "ConvAutoencoder": {
+                            "model_cls": ConvAutoencoder,
+                            "kwargs": {
+                                "input_shape": input_shape,
+                            },
+                            "ckpt_base": "conv_ae",
+                            "type": "conv_ae",
+                        },
+                        "PatchTST": {
+                            "model_cls": PatchTST,
+                            "kwargs": {
+                                "c_in": in_channels,
+                                "target_dim": seq_len,
+                                "patch_len": patch_len,
+                                "stride": stride,
+                                "num_patch": num_patch,
+                                "head_type": "pretrain",
+                                "d_model": m_cfg.get("patchtst", {}).get("d_model", 64),
+                                "n_layers": m_cfg.get("patchtst", {}).get("e_layers", 3),
+                                "n_heads": m_cfg.get("patchtst", {}).get("n_heads", 4),
+                                "dropout": m_cfg.get("patchtst", {}).get("dropout", 0.1),
+                                "attn_dropout": m_cfg.get("patchtst", {}).get("attn_dropout", 0.1),
+                                "head_dropout": m_cfg.get("patchtst", {}).get("head_dropout", 0.2),
+                            },
+                            "ckpt_base": "patchtst",
+                            "type": "patchtst",
+                        },
+                        "Anomaly Transformer": {
+                            "model_cls": AnomalyTransformer,
+                            "kwargs": {
+                                "win_size": seq_len,
+                                "enc_in": in_channels,
+                                "c_out": in_channels,
+                                "d_model": m_cfg.get("anomaly_transformer", {}).get("d_model", 128),
+                                "n_heads": m_cfg.get("anomaly_transformer", {}).get("n_heads", 8),
+                                "e_layers": m_cfg.get("anomaly_transformer", {}).get("e_layers", 3),
+                                "d_ff": m_cfg.get("anomaly_transformer", {}).get("d_ff", 256),
+                                "dropout": m_cfg.get("anomaly_transformer", {}).get("dropoufrac_tagt", 0.1),
+                            },
+                            "ckpt_base": "anomaly_transformer",
+                            "type": "anomaly_transformer",
+                        },
                     }
 
-                    if cfg["type"] == "patchtst":
-                        evaluator_kwargs["patch_len"] = patch_len
-                        evaluator_kwargs["stride"] = stride
-                    elif cfg["type"] == "ts2vec_knn":
-                        evaluator_kwargs["train_loader"] = train_loader
+                    mask_results = {}
 
-                    evaluator = AnomalyFourClassEvaluator(**evaluator_kwargs)
+                    # Iterative Model Benchmarking
+                    for model_name, cfg in models_config.items():
+                        target_dir = checkpoint_dir / experiment_tag / f"{cfg['ckpt_base']}_{model_ckpt_dir}"
+                        mask_ckpt_path = target_dir / "best_model.pt"
+                        base_ckpt_path = checkpoint_dir / f"{cfg['ckpt_base']}.pt"
 
-                    res = evaluate_unsupervised_model(
-                        model_name=model_name,
-                        evaluator=evaluator,
-                        val_loader=val_loader,
-                        test_loader=test_loader,
-                        percentile=percentile_tau,
-                        metadata_df=metadata_df,
-                        top_n_reports=20,
-                    )
-                    mask_results[model_name] = res
+                        if mask_ckpt_path.exists():
+                            ckpt_path = mask_ckpt_path
+                            run_dir = target_dir
+                        elif base_ckpt_path.exists():
+                            ckpt_path = base_ckpt_path
+                            run_dir = checkpoint_dir
+                        else:
+                            logger.warning(
+                                "Checkpoint for %s [%s] not found at %s or %s. Skipping...",
+                                model_name,
+                                mask_name,
+                                mask_ckpt_path,
+                                base_ckpt_path,
+                            )
+                            continue
 
-                    # Combine ML test evaluation results with stored computational metrics
-                    all_mask_summary_rows.append({
-                        "Feature Mask": mask_name,
-                        "Model": model_name,
-                        "AUROC": res["AUROC"],
-                        "PR-AUC": res["PR-AUC"],
-                        "Accuracy": res["Accuracy"],
-                        "Binary F1": res["Binary F1"],
-                        "Macro F1": res["Macro F1"],
-                        "Binary F2": res["Binary F2"],
-                        "Precision": res["Precision"],
-                        "Recall": res["Recall"],
-                        "FPR": res["FPR"],
-                        "FNR": res["FNR"],                       
-                        "Calibrated Tau": res["Calibrated Tau"],
-                        # Computational / Hardware Benchmarks (from JSON or raw checkpoint)
-                        "Params (M)": json_metrics.get("params_m", ckpt_comp.get("params_m", np.nan)),
-                        "FLOPs (G)": json_metrics.get("forward_gflops", ckpt_comp.get("forward_gflops", np.nan)),
-                        "Latency (ms)": json_metrics.get("inference_latency_ms", ckpt_comp.get("inference_latency_ms", np.nan)),
-                        "Throughput (samp/s)": json_metrics.get("throughput_samples_per_sec", ckpt_comp.get("throughput_samples_per_sec", np.nan)),
-                        "Peak VRAM (GB)": json_metrics.get("peak_vram_gb", ckpt_comp.get("peak_vram_gb", np.nan)),
-                    })
+                        logger.info("Loading Checkpoint for %s [%s]: %s", model_name, mask_name, ckpt_path)
 
-                    # visualize per model and run_identifier
-                    visualize_and_save_top_anomalies(
-                        model_name=model_name,
-                        res=res,
-                        test_ds=test_ds,
-                        metadata_df=metadata_df,
-                        feature_names=feature_names,
-                        output_dir=str(run_dir),
-                        run_identifier=run_identifier,
-                        top_k=3,
-                        top_n=5,
-                    )
-                # display for all models within this run_identifier
-                display_and_save_confusion_matrices(mask_results, output_dir=plots_dir, mask_name=run_identifier)
+                        model = cfg["model_cls"](**cfg["kwargs"]).to(device)
+                        state_dict, raw_ckpt = load_clean_state_dict(ckpt_path, device)
+                        model.load_state_dict(state_dict)
+                        model.eval()
+
+                        # Read companion JSON metrics if available
+                        json_metrics = load_checkpoint_metrics_json(run_dir, "best_model_metrics.json")
+
+                        # Fall back to checkpoint dictionary if JSON isn't present
+                        ckpt_comp = raw_ckpt.get("computational_metrics", {}) if isinstance(raw_ckpt, dict) else {}
+
+                        feature_names = test_ds.get_feature_names()
+                        metadata_df = test_ds.get_metadata()
+
+                        evaluator_kwargs = {
+                            "model": model,
+                            "model_type": cfg["type"],
+                            "device": device.type,
+                            "feature_names": feature_names,
+                            "metadata_df": metadata_df,
+                        }
+
+                        if cfg["type"] == "patchtst":
+                            evaluator_kwargs["patch_len"] = patch_len
+                            evaluator_kwargs["stride"] = stride
+                        elif cfg["type"] == "ts2vec_knn":
+                            evaluator_kwargs["train_loader"] = train_loader
+
+                        evaluator = AnomalyFourClassEvaluator(**evaluator_kwargs)
+
+                        res = evaluate_unsupervised_model(
+                            model_name=model_name,
+                            evaluator=evaluator,
+                            val_loader=val_loader,
+                            test_loader=test_loader,
+                            percentile=percentile_tau,
+                            metadata_df=metadata_df,
+                            top_n_reports=20,
+                        )
+                        mask_results[model_name] = res
+
+                        # Combine ML test evaluation results with stored computational metrics
+                        all_mask_summary_rows.append({
+                            "Feature Mask": mask_name,
+                            "Train LOGO": train_logo or "NONE",
+                            "Test LOGO": inf_logo or "NONE",
+                            "Data Fraction": fraction,
+                            "Model": model_name,
+                            "AUROC": res["AUROC"],
+                            "PR-AUC": res["PR-AUC"],
+                            "Accuracy": res["Accuracy"],
+                            "Binary F1": res["Binary F1"],
+                            "Macro F1": res["Macro F1"],
+                            "Binary F2": res["Binary F2"],
+                            "Precision": res["Precision"],
+                            "Recall": res["Recall"],
+                            "FPR": res["FPR"],
+                            "FNR": res["FNR"],                       
+                            "Calibrated Tau": res["Calibrated Tau"],
+                            # Computational / Hardware Benchmarks (from JSON or raw checkpoint)
+                            "Params (M)": json_metrics.get("params_m", ckpt_comp.get("params_m", np.nan)),
+                            "FLOPs (G)": json_metrics.get("forward_gflops", ckpt_comp.get("forward_gflops", np.nan)),
+                            "Latency (ms)": json_metrics.get("inference_latency_ms", ckpt_comp.get("inference_latency_ms", np.nan)),
+                            "Throughput (samp/s)": json_metrics.get("throughput_samples_per_sec", ckpt_comp.get("throughput_samples_per_sec", np.nan)),
+                            "Peak VRAM (GB)": json_metrics.get("peak_vram_gb", ckpt_comp.get("peak_vram_gb", np.nan)),
+                        })
+
+                        # visualize per model and run_identifier
+                        visualize_and_save_top_anomalies(
+                            model_name=model_name,
+                            res=res,
+                            test_ds=test_ds,
+                            metadata_df=metadata_df,
+                            feature_names=feature_names,
+                            output_dir=str(run_dir),
+                            run_identifier=run_identifier,
+                            top_k=3,
+                            top_n=5,
+                        )
+                    # display for all models within this run_identifier
+                    display_and_save_confusion_matrices(mask_results, output_dir=plots_dir, mask_name=run_identifier)
 
 
 
@@ -611,9 +649,9 @@ def main():
             df_overall["% Δ AUROC"] = 0.00
             df_overall["% Δ PR-AUC"] = 0.00
 
-        # Sort cleanly by Feature Mask and PR-AUC
+        # Sort cleanly including Data Fraction
         df_overall = df_overall.sort_values(
-            by=["Feature Mask", "PR-AUC"], ascending=[True, False]
+            by=["Feature Mask", "Data Fraction", "PR-AUC"], ascending=[True, False, False]
         ).reset_index(drop=True)
 
         logger.info(

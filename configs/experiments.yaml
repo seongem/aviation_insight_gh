@@ -1,3 +1,4 @@
+experiment_tag: features_sweep
 defaults:
   batch_size: 512
   learning_rate: 0.0001
@@ -8,36 +9,42 @@ defaults:
   patience: 10
   patience_delta: 0.0005
 
+data_fractions:
+  #  - 0.25
+  #  - 0.50
+  #  - 0.75
+   - 1.0
+
 # Feature sets to sweep from features.csv
 feature_masks:
-  - enabled_baseline
-  - enabled_baseline_acc
-  - enabled_baseline_piml
+  # - enabled_baseline
+  # - enabled_baseline_acc
+  # - enabled_baseline_piml
   - enabled_all
 
 # Optional LOGO configurations
 logo_masks:
   train_time:
-    - null
-    # - logo_drop_g1_dynamics
-    # - logo_drop_g2_kinematics
-    # - logo_drop_g3_configuration
-    # - logo_drop_g4_propulsion
-    # - logo_drop_g5_guidance
-    # - logo_drop_g6_system___metadata
-    # - logo_drop_g7_accelerations___rates
-    # - logo_drop_g8_physics_residuals
+    # - null
+    - logo_drop_g1_dynamics
+    - logo_drop_g2_kinematics
+    - logo_drop_g3_configuration
+    - logo_drop_g4_propulsion
+    - logo_drop_g5_guidance
+    - logo_drop_g6_system___metadata
+    - logo_drop_g7_accelerations___rates
+    - logo_drop_g8_physics_residuals
 
   inference_time:
-    - null
-    # - logo_drop_g1_dynamics
-    # - logo_drop_g2_kinematics
-    # - logo_drop_g3_configuration
-    # - logo_drop_g4_propulsion
-    # - logo_drop_g5_guidance
-    # - logo_drop_g6_system___metadata
-    # - logo_drop_g7_accelerations___rates
-    # - logo_drop_g8_physics_residuals
+    # - null
+    - logo_drop_g1_dynamics
+    - logo_drop_g2_kinematics
+    - logo_drop_g3_configuration
+    - logo_drop_g4_propulsion
+    - logo_drop_g5_guidance
+    - logo_drop_g6_system___metadata
+    - logo_drop_g7_accelerations___rates
+    - logo_drop_g8_physics_residuals
 
 # Models to train
 models:

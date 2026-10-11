@@ -48,7 +48,7 @@ SENSOR_GROUPS = {
     0: "Unclassified",
 }
 
-# Full 31 Channel Specifications (20 Baseline + 6 Kinematics + 5 PIML Residuals)
+# Full 33 Channel Specifications (21 Baseline + 6 Kinematics + 6 PIML Residuals)
 CHANNEL_METADATA = [
     # Baseline Channels (0-19)
     (0, "Aileron Position LH", 1, "deg", "baseline_data", True, False, False),
@@ -86,8 +86,14 @@ CHANNEL_METADATA = [
     (28, "res_side_force", 8, "g", "piml_derived", False, False, True),
     (29, "vspd_fps", 8, "ft/s", "piml_derived", False, False, True),
     (30, "vt_dot", 8, "ft/s^2", "piml_derived", False, False, True),
-]
 
+    (31, "alpha_est", 1, "deg", "baseline_data", True, False, False),
+    (32, "res_flight_path_ae", 8, "ft/s", "piml_derived", True, False, False),
+    (33, "res_energy_rate_no_k3", 8, "ft/s", "piml_derived", True, False, False),
+    (34, "fractional_ttg", 8, "fraction", "baseline_data", False, False, True),
+    (35, "absolute_ttg_sec", 8, "seconds", "baseline_data", False, False, True),
+    (36, "res_nz", 8, "g", "piml_derived", False, False, True),
+]
 
 def execute_pipeline_build():
     set_seed(42)

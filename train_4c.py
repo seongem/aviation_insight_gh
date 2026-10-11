@@ -334,6 +334,10 @@ def train_conv_ae_epoch(model, dataloader, optimizer, criterion, scaler, device)
 def run_conv_ae_pipeline(exp_config_path: str):
     env = LoadEnvironment()
     exp_cfg = load_yaml_config(exp_config_path)
+    data_fractions = exp_cfg.get("data_fractions", [1.0]) # Default to full dataset if omitted
+
+    if not isinstance(data_fractions, list):
+        data_fractions = [data_fractions]
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     if device.type == "cuda":
@@ -356,6 +360,10 @@ def run_conv_ae_pipeline(exp_config_path: str):
     model_cfg = exp_cfg["models"]["conv_ae"]
     epochs = model_cfg.get("epochs", exp_cfg["defaults"].get("epochs", 30))
     lr = float(model_cfg.get("learning_rate", exp_cfg["defaults"].get("learning_rate", 1e-3)))
+    # 1. Initialize Early Stopping before epoch loop
+    patience = exp_cfg.get("defaults", {}).get("patience", 10)
+    patience_delta = exp_cfg.get("defaults", {}).get("patience_delta", 0.0005)
+    early_stopper = EarlyStopping(patience=patience, delta=patience_delta, mode="max")
 
     # -------------------------------------------------------------------------
     # FEATURE MASK & TRAIN-TIME LOGO SWEEP LOOP
@@ -369,216 +377,225 @@ def run_conv_ae_pipeline(exp_config_path: str):
 
     for mask_name in feature_masks:
         for logo_mask in train_logo_masks:
-            # Build descriptive directory name: e.g., omni_enabled_baseline_logo_acc
-            logo_tag = f"_logo_{logo_mask}" if logo_mask else ""
-            run_identifier = f"{mask_name}{logo_tag}"
-
-            logger.info(
-                f"\n================ MASK: {mask_name} | TRAIN LOGO: {logo_mask or 'NONE'} ================"
-            )
-
-            train_loader = val_loader = model = optimizer = evaluator = None  # Initialize to None for cleanup in finally block
-            try:
-                # 1. Datasets & Loaders
-                train_ds = AviationFourClassDataset(
-                    manifest_dir=env.DATABASE_DIR / "manifests",
-                    database_dir=env.DATABASE_DIR,
-                    stats_path=env.DATABASE_DIR / "metadata" / "train_split_stats.json",
-                    split="train",
-                    feature_set=mask_name,
-                    logo_mask_col=logo_mask,
-                )
-                val_ds = AviationFourClassDataset(
-                    manifest_dir=env.DATABASE_DIR / "manifests",
-                    database_dir=env.DATABASE_DIR,
-                    stats_path=env.DATABASE_DIR / "metadata" / "train_split_stats.json",
-                    split="val",
-                    feature_set=mask_name,
-                    logo_mask_col=logo_mask,
-                )
-
-
-
-                nominal_train_subset = train_ds.get_nominal_subset()
-                train_loader = DataLoader(
-                    nominal_train_subset,
-                    batch_size=exp_cfg["defaults"]["batch_size"],
-                    shuffle=True,
-                    num_workers=exp_cfg["defaults"].get("num_workers", 4),
-                    pin_memory=True,
-                    worker_init_fn=seed_worker,
-                    generator=g,
-                )
-                val_loader = DataLoader(
-                    val_ds,
-                    batch_size=exp_cfg["defaults"]["batch_size"],
-                    shuffle=False,
-                    num_workers=exp_cfg["defaults"].get("num_workers", 4),
-                    pin_memory=True,
-                    worker_init_fn=seed_worker,
-                    generator=g,
-                )
-
-                input_shape = (train_ds.window_size, train_ds.num_channels)
+            for fraction in data_fractions:
+                # Build descriptive directory name: e.g., omni_enabled_baseline_logo_acc
+                logo_tag = f"_logo_{logo_mask}" if logo_mask else ""
+                frac_tag = f"_frac_{int(fraction * 100)}" if fraction < 1.0 else ""
+                run_identifier = f"{mask_name}{logo_tag}{frac_tag}"
 
                 logger.info(
-                    f"🚀 Training ConvAutoencoder on [{mask_name}] | Input Shape: {input_shape} | "
-                    f"Epochs: {epochs} | LR: {lr}"
+                    f"\n================ MASK: {mask_name} | TRAIN LOGO: {logo_mask or 'NONE'} ================"
                 )
 
-                # 2. Instantiate ConvAutoencoder Model
-                model = ConvAutoencoder(input_shape=input_shape).to(device)
-
-                optimizer = torch.optim.Adam(
-                    model.parameters(),
-                    lr=lr,
-                    weight_decay=float(exp_cfg["defaults"].get("weight_decay", 1e-5)),
-                )
-                criterion = nn.MSELoss()
-                scaler = torch.amp.GradScaler("cuda") if device.type == "cuda" else None
-
-                evaluator = AnomalyFourClassEvaluator(
-                    model=model,
-                    model_type="conv_ae",
-                    device=device.type,
-                )
-
-                # 2. Checkpoint Save Directory with LOGO Tag
-                save_dir = checkpoint_base_dir / f"{evaluator.model_type}_{run_identifier}"
-                save_dir.mkdir(parents=True, exist_ok=True)
-                
-                logger.info(f"Saving checkpoints to: {save_dir}")
-
-                # =====================================================================
-                # Measure Static Model Complexity (Before Epoch Loop)
-                # =====================================================================
-                # Take a single sample window from train_loader for shape probing
-                sample_batch = next(iter(train_loader))
-                sample_x = sample_batch[0][:1]  # Shape: (1, seq_len, num_features)
-
-                complexity_info = measure_model_complexity(model, sample_x)
-                inference_latency_ms = measure_inference_latency(model, sample_x)
-
-                # Reset peak GPU memory stats before training begins
-                if torch.cuda.is_available():
-                    torch.cuda.reset_peak_memory_stats()
-
-                best_pr_auc = 0.0
-                # Metrics history container
-                metrics_history = []
-
-                for epoch in range(1, epochs + 1):
-                    # Synchronize and start timer for epoch throughput calculation
-                    if torch.cuda.is_available():
-                        torch.cuda.synchronize()
-                    epoch_start_time = time.perf_counter()
-                    start_time = time.time()
-                    avg_train_loss = train_conv_ae_epoch(model, train_loader, optimizer, criterion, scaler, device)
-                    elapsed = time.time() - start_time
-
-                    # Fast evaluation during training loop (no autograd, no cuDNN errors)
-                    val_metrics = evaluator.get_metrics(val_loader, compute_gradients=False)
-                    current_pr_auc = val_metrics["PR-AUC"]
-
-                    if torch.cuda.is_available():
-                            torch.cuda.synchronize()
-                    epoch_duration_sec = time.perf_counter() - epoch_start_time
-
-                    # Calculate throughput (samples / sec)
-                    total_samples = len(train_loader.dataset)
-                    throughput = total_samples / epoch_duration_sec if epoch_duration_sec > 0 else 0.0
-
-                    # Capture Peak VRAM usage
-                    peak_vram_gb = (
-                        torch.cuda.max_memory_allocated() / (1024 ** 3) 
-                        if torch.cuda.is_available() else 0.0
+                train_loader = val_loader = model = optimizer = evaluator = None  # Initialize to None for cleanup in finally block
+                try:
+                    # 1. Datasets & Loaders
+                    train_ds = AviationFourClassDataset(
+                        manifest_dir=env.DATABASE_DIR / "manifests",
+                        database_dir=env.DATABASE_DIR,
+                        stats_path=env.DATABASE_DIR / "metadata" / "train_split_stats.json",
+                        split="train",
+                        feature_set=mask_name,
+                        logo_mask_col=logo_mask,
                     )
+                    val_ds = AviationFourClassDataset(
+                        manifest_dir=env.DATABASE_DIR / "manifests",
+                        database_dir=env.DATABASE_DIR,
+                        stats_path=env.DATABASE_DIR / "metadata" / "train_split_stats.json",
+                        split="val",
+                        feature_set=mask_name,
+                        logo_mask_col=logo_mask,
+                    )
+
+
+
+                    nominal_train_subset = train_ds.get_nominal_subset()
+                    train_loader = DataLoader(
+                        nominal_train_subset,
+                        batch_size=exp_cfg["defaults"]["batch_size"],
+                        shuffle=True,
+                        num_workers=exp_cfg["defaults"].get("num_workers", 4),
+                        pin_memory=True,
+                        worker_init_fn=seed_worker,
+                        generator=g,
+                    )
+                    val_loader = DataLoader(
+                        val_ds,
+                        batch_size=exp_cfg["defaults"]["batch_size"],
+                        shuffle=False,
+                        num_workers=exp_cfg["defaults"].get("num_workers", 4),
+                        pin_memory=True,
+                        worker_init_fn=seed_worker,
+                        generator=g,
+                    )
+
+                    input_shape = (train_ds.window_size, train_ds.num_channels)
 
                     logger.info(
-                        f"Epoch {epoch:02d}/{epochs:02d} | Train Loss: {avg_train_loss:.6f} | "
-                        f"Val AUROC: {val_metrics['AUROC']:.4f} | Val PR-AUC: {current_pr_auc:.4f} | "
-                        f"Val F1_Macro: {val_metrics['F1_Macro']:.4f} | Val F1_Binary: {val_metrics['F1_Binary']:.4f} | "
-                        f"Time: {epoch_duration_sec:.2f}s | Throughput: {throughput:.2f} samples/sec | Peak VRAM: {peak_vram_gb:.2f} GB"
+                        f"🚀 Training ConvAutoencoder on [{mask_name}] | Input Shape: {input_shape} | "
+                        f"Epochs: {epochs} | LR: {lr}"
                     )
 
-                    if current_pr_auc > best_pr_auc:
-                        best_pr_auc = current_pr_auc
-                        
-                        save_checkpoint_and_metrics(
-                                save_dir=save_dir,
-                                filename="best_model.pt",
-                                epoch=epoch,
-                                model=model,
-                                optimizer=optimizer,
-                                scheduler=None,  # Pass None if no scheduler
-                                best_val_pr_auc=best_pr_auc,
-                                train_loss=avg_train_loss,
-                                val_metrics=val_metrics,
-                                complexity_info=complexity_info,
-                                inference_latency_ms=inference_latency_ms,
-                                epoch_duration_sec=epoch_duration_sec,
-                                throughput=throughput,
-                                peak_vram_gb=peak_vram_gb,
-                                run_identifier=run_identifier,
-                                mask_name=mask_name,
-                                logo_mask=logo_mask,
+                    # 2. Instantiate ConvAutoencoder Model
+                    model = ConvAutoencoder(input_shape=input_shape).to(device)
+
+                    optimizer = torch.optim.Adam(
+                        model.parameters(),
+                        lr=lr,
+                        weight_decay=float(exp_cfg["defaults"].get("weight_decay", 1e-5)),
+                    )
+                    criterion = nn.MSELoss()
+                    scaler = torch.amp.GradScaler("cuda") if device.type == "cuda" else None
+
+                    evaluator = AnomalyFourClassEvaluator(
+                        model=model,
+                        model_type="conv_ae",
+                        device=device.type,
+                    )
+
+                    # 2. Checkpoint Save Directory with LOGO Tag
+                    experiment_tag = exp_cfg.get("experiment_tag", "standard_training")
+                    save_dir = checkpoint_base_dir / experiment_tag / f"{evaluator.model_type}_{run_identifier}"
+                    save_dir.mkdir(parents=True, exist_ok=True)
+                    
+                    logger.info(f"Saving checkpoints to: {save_dir}")
+
+                    # =====================================================================
+                    # Measure Static Model Complexity (Before Epoch Loop)
+                    # =====================================================================
+                    # Take a single sample window from train_loader for shape probing
+                    sample_batch = next(iter(train_loader))
+                    sample_x = sample_batch[0][:1]  # Shape: (1, seq_len, num_features)
+
+                    complexity_info = measure_model_complexity(model, sample_x)
+                    inference_latency_ms = measure_inference_latency(model, sample_x)
+
+                    # Reset peak GPU memory stats before training begins
+                    if torch.cuda.is_available():
+                        torch.cuda.reset_peak_memory_stats()
+
+                    best_pr_auc = 0.0
+                    # Metrics history container
+                    metrics_history = []
+
+                    for epoch in range(1, epochs + 1):
+                        # Synchronize and start timer for epoch throughput calculation
+                        if torch.cuda.is_available():
+                            torch.cuda.synchronize()
+                        epoch_start_time = time.perf_counter()
+                        start_time = time.time()
+                        avg_train_loss = train_conv_ae_epoch(model, train_loader, optimizer, criterion, scaler, device)
+                        elapsed = time.time() - start_time
+
+                        # Fast evaluation during training loop (no autograd, no cuDNN errors)
+                        val_metrics = evaluator.get_metrics(val_loader, compute_gradients=False)
+                        current_pr_auc = val_metrics["PR-AUC"]
+
+                        if torch.cuda.is_available():
+                                torch.cuda.synchronize()
+                        epoch_duration_sec = time.perf_counter() - epoch_start_time
+
+                        # Calculate throughput (samples / sec)
+                        total_samples = len(train_loader.dataset)
+                        throughput = total_samples / epoch_duration_sec if epoch_duration_sec > 0 else 0.0
+
+                        # Capture Peak VRAM usage
+                        peak_vram_gb = (
+                            torch.cuda.max_memory_allocated() / (1024 ** 3) 
+                            if torch.cuda.is_available() else 0.0
                         )
-                        logger.info(f"  ⭐️ New best ConvAutoencoder PR-AUC saved: {best_pr_auc:.4f}")
 
-                    metrics_history.append({
-                            "epoch": epoch,
-                            "model_type": evaluator.model_type,
-                            "feature_mask": mask_name,
-                            "logo_mask": logo_mask or "none",
-                            "run_identifier": run_identifier,
-                            # Core Summary
-                            "train_loss": avg_train_loss,
-                            "val_pr_auc": val_metrics.get("PR-AUC", 0.0),
-                            "val_auroc": val_metrics.get("AUROC", 0.0),
-                            "val_f1_binary": val_metrics.get("F1_Binary", 0.0),
-                            "val_f1_macro": val_metrics.get("F1_Macro", 0.0),
-                            # Operational & Convergence Metrics
-                            "calibrated_tau": val_metrics.get("Calibrated_Tau", 0.0),
-                            "precision": val_metrics.get("Prec", 0.0),
-                            "recall": val_metrics.get("Rec", 0.0),
-                            "fpr": val_metrics.get("FPR", 0.0),
-                            "fnr": val_metrics.get("FNR", 0.0),
-                            # Count Metrics for Convergence Tracking
-                            "tp_count": val_metrics.get("TP", 0),
-                            "fp_count": val_metrics.get("FP", 0),
-                            "tn_count": val_metrics.get("TN", 0),
-                            "fn_count": val_metrics.get("FN", 0),
-                            "total_detected_anomalies": val_metrics.get("TP", 0) + val_metrics.get("FP", 0),
-                            # Computational Metrics
-                            "params_m": complexity_info["params_m"],
-                            "forward_gflops": complexity_info["gflops"],
-                            "inference_latency_ms": inference_latency_ms,
-                            "epoch_duration_sec": epoch_duration_sec,
-                            "throughput_samples_per_sec": throughput,
-                            "peak_vram_gb": peak_vram_gb,
-                        })
+                        logger.info(
+                            f"Epoch {epoch:02d}/{epochs:02d} | Train Loss: {avg_train_loss:.6f} | "
+                            f"Val AUROC: {val_metrics['AUROC']:.4f} | Val PR-AUC: {current_pr_auc:.4f} | "
+                            f"Val F1_Macro: {val_metrics['F1_Macro']:.4f} | Val F1_Binary: {val_metrics['F1_Binary']:.4f} | "
+                            f"Time: {epoch_duration_sec:.2f}s | Throughput: {throughput:.2f} samples/sec | Peak VRAM: {peak_vram_gb:.2f} GB"
+                        )
 
-                # Save structured history alongside best model checkpoint
-                history_path = save_dir / "training_history.json"
-                with open(history_path, "w") as f:
-                    json.dump(metrics_history, f, indent=2, cls=NpEncoder)
+                        # 2. Update Early Stopper and Check Best Score
+                        is_early_stop = early_stopper(current_pr_auc)
+                            
+                        if early_stopper.counter == 0:
+                            
+                            save_checkpoint_and_metrics(
+                                    save_dir=save_dir,
+                                    filename="best_model.pt",
+                                    epoch=epoch,
+                                    model=model,
+                                    optimizer=optimizer,
+                                    scheduler=None,  # Pass None if no scheduler
+                                    best_val_pr_auc=early_stopper.best_metric_val,
+                                    train_loss=avg_train_loss,
+                                    val_metrics=val_metrics,
+                                    complexity_info=complexity_info,
+                                    inference_latency_ms=inference_latency_ms,
+                                    epoch_duration_sec=epoch_duration_sec,
+                                    throughput=throughput,
+                                    peak_vram_gb=peak_vram_gb,
+                                    run_identifier=run_identifier,
+                                    mask_name=mask_name,
+                                    logo_mask=logo_mask,
+                            )
+                            logger.info(f"  ⭐️ New best ConvAutoencoder PR-AUC saved: {early_stopper.best_metric_val:.4f}")
 
-            except Exception as e:
-                logger.error(f"[ERROR] Failed at Mask: {mask_name}, Group: {run_identifier} -> {e}")
-                # Decide whether to raise or continue to the next fold
-                continue
+                        metrics_history.append({
+                                "epoch": epoch,
+                                "model_type": evaluator.model_type,
+                                "feature_mask": mask_name,
+                                "logo_mask": logo_mask or "none",
+                                "run_identifier": run_identifier,
+                                # Core Summary
+                                "train_loss": avg_train_loss,
+                                "val_pr_auc": val_metrics.get("PR-AUC", 0.0),
+                                "val_auroc": val_metrics.get("AUROC", 0.0),
+                                "val_f1_binary": val_metrics.get("F1_Binary", 0.0),
+                                "val_f1_macro": val_metrics.get("F1_Macro", 0.0),
+                                # Operational & Convergence Metrics
+                                "calibrated_tau": val_metrics.get("Calibrated_Tau", 0.0),
+                                "precision": val_metrics.get("Prec", 0.0),
+                                "recall": val_metrics.get("Rec", 0.0),
+                                "fpr": val_metrics.get("FPR", 0.0),
+                                "fnr": val_metrics.get("FNR", 0.0),
+                                # Count Metrics for Convergence Tracking
+                                "tp_count": val_metrics.get("TP", 0),
+                                "fp_count": val_metrics.get("FP", 0),
+                                "tn_count": val_metrics.get("TN", 0),
+                                "fn_count": val_metrics.get("FN", 0),
+                                "total_detected_anomalies": val_metrics.get("TP", 0) + val_metrics.get("FP", 0),
+                                # Computational Metrics
+                                "params_m": complexity_info["params_m"],
+                                "forward_gflops": complexity_info["gflops"],
+                                "inference_latency_ms": inference_latency_ms,
+                                "epoch_duration_sec": epoch_duration_sec,
+                                "throughput_samples_per_sec": throughput,
+                                "peak_vram_gb": peak_vram_gb,
+                            })
+                        # 3. Check Early Stopping Condition to Break Loop
+                        if is_early_stop:
+                            logger.info(f"\n✋ Early stopping triggered at Epoch {epoch:02d}. Advancing to next model...")
+                            break
 
-            finally:
-                # Pass whichever variables exist in the scope of the current pipeline
-                cleanup_pipeline_resources(
-                    model, 
-                    optimizer, 
-                    train_loader, 
-                    val_loader, 
-                    evaluator
-                )
-                # Re-assign variables to None if they remain in caller scope
-                model = optimizer = train_loader = val_loader = evaluator = None
+                    # Save structured history alongside best model checkpoint
+                    history_path = save_dir / "training_history.json"
+                    with open(history_path, "w") as f:
+                        json.dump(metrics_history, f, indent=2, cls=NpEncoder)
+
+                except Exception as e:
+                    logger.error(f"[ERROR] Failed at Mask: {mask_name}, Group: {run_identifier} -> {e}")
+                    # Decide whether to raise or continue to the next fold
+                    continue
+
+                finally:
+                    # Pass whichever variables exist in the scope of the current pipeline
+                    cleanup_pipeline_resources(
+                        model, 
+                        optimizer, 
+                        train_loader, 
+                        val_loader, 
+                        evaluator
+                    )
+                    # Re-assign variables to None if they remain in caller scope
+                    model = optimizer = train_loader = val_loader = evaluator = None
 
 
 def train_lstm_vae_epoch(model, dataloader, optimizer, beta, scaler, device) -> float:
@@ -611,6 +628,10 @@ def train_lstm_vae_epoch(model, dataloader, optimizer, beta, scaler, device) -> 
 def run_lstm_vae_pipeline(exp_config_path: str):
     env = LoadEnvironment()
     exp_cfg = load_yaml_config(exp_config_path)
+    data_fractions = exp_cfg.get("data_fractions", [1.0]) # Default to full dataset if omitted
+
+    if not isinstance(data_fractions, list):
+        data_fractions = [data_fractions]
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     if device.type == "cuda":
@@ -632,7 +653,12 @@ def run_lstm_vae_pipeline(exp_config_path: str):
 
     model_cfg = exp_cfg["models"]["lstm_vae"]
     beta = float(model_cfg.get("beta", 1.0))
-    epochs = model_cfg.get("epochs", exp_cfg["defaults"].get("epochs", 25))
+
+    # 1. Initialize Early Stopping before epoch loop
+    patience = exp_cfg.get("defaults", {}).get("patience", 10)
+    patience_delta = exp_cfg.get("defaults", {}).get("patience_delta", 0.0005)
+    early_stopper = EarlyStopping(patience=patience, delta=patience_delta, mode="max")
+    epochs = model_cfg.get("epochs", exp_cfg["defaults"].get("epochs", 30))
 
     # -------------------------------------------------------------------------
     # FEATURE MASK & TRAIN-TIME LOGO SWEEP LOOP
@@ -646,215 +672,226 @@ def run_lstm_vae_pipeline(exp_config_path: str):
 
     for mask_name in feature_masks:
         for logo_mask in train_logo_masks:
-            # Build descriptive directory name: e.g., omni_enabled_baseline_logo_acc
-            logo_tag = f"_logo_{logo_mask}" if logo_mask else ""
-            run_identifier = f"{mask_name}{logo_tag}"
+            for fraction in data_fractions:
+                # Build descriptive directory name: e.g., omni_enabled_baseline_logo_acc
+                logo_tag = f"_logo_{logo_mask}" if logo_mask else ""
+                frac_tag = f"_frac_{int(fraction * 100)}" if fraction < 1.0 else ""
+                run_identifier = f"{mask_name}{logo_tag}{frac_tag}"
 
-            logger.info(
-                f"\n================ MASK: {mask_name} | TRAIN LOGO: {logo_mask or 'NONE'} ================"
-            )
-
-            model = optimizer = train_loader = val_loader = evaluator = None
-            try: 
-                # 1. Datasets & Loaders
-                train_ds = AviationFourClassDataset(
-                    manifest_dir=env.DATABASE_DIR / "manifests",
-                    database_dir=env.DATABASE_DIR,
-                    stats_path=env.DATABASE_DIR / "metadata" / "train_split_stats.json",
-                    split="train",
-                    feature_set=mask_name,
-                    logo_mask_col=logo_mask,
-                )
-                val_ds = AviationFourClassDataset(
-                    manifest_dir=env.DATABASE_DIR / "manifests",
-                    database_dir=env.DATABASE_DIR,
-                    stats_path=env.DATABASE_DIR / "metadata" / "train_split_stats.json",
-                    split="val",
-                    feature_set=mask_name,
-                    logo_mask_col=logo_mask,
-                )
-
-                nominal_train_subset = train_ds.get_nominal_subset()
-                train_loader = DataLoader(
-                    nominal_train_subset,
-                    batch_size=exp_cfg["defaults"]["batch_size"],
-                    shuffle=True,
-                    num_workers=exp_cfg["defaults"].get("num_workers", 4),
-                    pin_memory=True,
-                    worker_init_fn=seed_worker,
-                    generator=g,
-                )
-                val_loader = DataLoader(
-                    val_ds,
-                    batch_size=exp_cfg["defaults"]["batch_size"],
-                    shuffle=False,
-                    num_workers=exp_cfg["defaults"].get("num_workers", 4),
-                    pin_memory=True,
-                    worker_init_fn=seed_worker,
-                    generator=g,
-                )
 
                 logger.info(
-                    f"🚀 Training LSTM-VAE on [{mask_name}] | Window: {train_ds.window_size} | "
-                    f"Channels: {train_ds.num_channels} | Epochs: {epochs}"
+                    f"\n================ MASK: {mask_name} | TRAIN LOGO: {logo_mask or 'NONE'} ================"
                 )
 
-                # 2. Instantiate LSTM-VAE Model
-                model = LSTMVAE(
-                    input_dim=train_ds.num_channels,
-                    hidden_dim=model_cfg.get("hidden_dim", 128),
-                    latent_dim=model_cfg.get("latent_dim", 32),
-                    num_layers=model_cfg.get("num_layers", 2),
-                    dropout=model_cfg.get("dropout", 0.1),
-                ).to(device)
+                model = optimizer = train_loader = val_loader = evaluator = None
+                try: 
+                    # 1. Datasets & Loaders
+                    train_ds = AviationFourClassDataset(
+                        manifest_dir=env.DATABASE_DIR / "manifests",
+                        database_dir=env.DATABASE_DIR,
+                        stats_path=env.DATABASE_DIR / "metadata" / "train_split_stats.json",
+                        split="train",
+                        feature_set=mask_name,
+                        logo_mask_col=logo_mask,
+                    )
+                    val_ds = AviationFourClassDataset(
+                        manifest_dir=env.DATABASE_DIR / "manifests",
+                        database_dir=env.DATABASE_DIR,
+                        stats_path=env.DATABASE_DIR / "metadata" / "train_split_stats.json",
+                        split="val",
+                        feature_set=mask_name,
+                        logo_mask_col=logo_mask,
+                    )
 
-                optimizer = torch.optim.AdamW(
-                    model.parameters(),
-                    lr=float(exp_cfg["defaults"].get("learning_rate", 1e-4)),
-                    weight_decay=float(exp_cfg["defaults"].get("weight_decay", 1e-5)),
-                )
-                scaler = torch.amp.GradScaler("cuda") if device.type == "cuda" else None
-
-                evaluator = AnomalyFourClassEvaluator(
-                    model=model,
-                    model_type="lstm_vae",
-                    device=device.type,
-                )
-
-                # 2. Checkpoint Save Directory with LOGO Tag
-                save_dir = checkpoint_base_dir / f"{evaluator.model_type}_{run_identifier}"
-                save_dir.mkdir(parents=True, exist_ok=True)
-                
-                logger.info(f"Saving checkpoints to: {save_dir}")
-
-                # =====================================================================
-                # Measure Static Model Complexity (Before Epoch Loop)
-                # =====================================================================
-                # Take a single sample window from train_loader for shape probing
-                sample_batch = next(iter(train_loader))
-                sample_x = sample_batch[0][:1]  # Shape: (1, seq_len, num_features)
-
-                complexity_info = measure_model_complexity(model, sample_x)
-                inference_latency_ms = measure_inference_latency(model, sample_x)
-
-                # Reset peak GPU memory stats before training begins
-                if torch.cuda.is_available():
-                    torch.cuda.reset_peak_memory_stats()
-
-                best_pr_auc = 0.0
-                # Metrics history container
-                metrics_history = []
-
-                for epoch in range(1, epochs + 1):
-                    # Synchronize and start timer for epoch throughput calculation
-                    if torch.cuda.is_available():
-                        torch.cuda.synchronize()
-                    epoch_start_time = time.perf_counter()
-
-                    start_time = time.time()
-                    avg_train_loss = train_lstm_vae_epoch(model, train_loader, optimizer, beta, scaler, device)
-                    elapsed = time.time() - start_time
-
-                    # Fast evaluation during training loop (no autograd, no cuDNN errors)
-                    val_metrics = evaluator.get_metrics(val_loader, compute_gradients=False)
-                    current_pr_auc = val_metrics["PR-AUC"]
-
-                    if torch.cuda.is_available():
-                            torch.cuda.synchronize()
-                    epoch_duration_sec = time.perf_counter() - epoch_start_time
-
-                    # Calculate throughput (samples / sec)
-                    total_samples = len(train_loader.dataset)
-                    throughput = total_samples / epoch_duration_sec if epoch_duration_sec > 0 else 0.0
-
-                    # Capture Peak VRAM usage
-                    peak_vram_gb = (
-                        torch.cuda.max_memory_allocated() / (1024 ** 3) 
-                        if torch.cuda.is_available() else 0.0
+                    nominal_train_subset = train_ds.get_nominal_subset()
+                    train_loader = DataLoader(
+                        nominal_train_subset,
+                        batch_size=exp_cfg["defaults"]["batch_size"],
+                        shuffle=True,
+                        num_workers=exp_cfg["defaults"].get("num_workers", 4),
+                        pin_memory=True,
+                        worker_init_fn=seed_worker,
+                        generator=g,
+                    )
+                    val_loader = DataLoader(
+                        val_ds,
+                        batch_size=exp_cfg["defaults"]["batch_size"],
+                        shuffle=False,
+                        num_workers=exp_cfg["defaults"].get("num_workers", 4),
+                        pin_memory=True,
+                        worker_init_fn=seed_worker,
+                        generator=g,
                     )
 
                     logger.info(
-                        f"Epoch {epoch:02d}/{epochs:02d} | Train Loss: {avg_train_loss:.6f} | "
-                        f"Val AUROC: {val_metrics['AUROC']:.4f} | Val PR-AUC: {current_pr_auc:.4f} | "
-                        f"Val F1_Macro: {val_metrics['F1_Macro']:.4f} | Val F1_Binary: {val_metrics['F1_Binary']:.4f} | "
-                        f"Time: {epoch_duration_sec:.2f}s | Throughput: {throughput:.2f} samples/sec | Peak VRAM: {peak_vram_gb:.2f} GB"
+                        f"🚀 Training LSTM-VAE on [{mask_name}] | Window: {train_ds.window_size} | "
+                        f"Channels: {train_ds.num_channels} | Epochs: {epochs}"
                     )
 
-                    if current_pr_auc > best_pr_auc:
-                        best_pr_auc = current_pr_auc
-                        save_checkpoint_and_metrics(
-                                save_dir=save_dir,
-                                filename="best_model.pt",
-                                epoch=epoch,
-                                model=model,
-                                optimizer=optimizer,
-                                scheduler=None,  # Pass None if no scheduler
-                                best_val_pr_auc=best_pr_auc,
-                                train_loss=avg_train_loss,
-                                val_metrics=val_metrics,
-                                complexity_info=complexity_info,
-                                inference_latency_ms=inference_latency_ms,
-                                epoch_duration_sec=epoch_duration_sec,
-                                throughput=throughput,
-                                peak_vram_gb=peak_vram_gb,
-                                run_identifier=run_identifier,
-                                mask_name=mask_name,
-                                logo_mask=logo_mask,
+                    # 2. Instantiate LSTM-VAE Model
+                    model = LSTMVAE(
+                        input_dim=train_ds.num_channels,
+                        hidden_dim=model_cfg.get("hidden_dim", 128),
+                        latent_dim=model_cfg.get("latent_dim", 32),
+                        num_layers=model_cfg.get("num_layers", 2),
+                        dropout=model_cfg.get("dropout", 0.1),
+                    ).to(device)
+
+                    optimizer = torch.optim.AdamW(
+                        model.parameters(),
+                        lr=float(exp_cfg["defaults"].get("learning_rate", 1e-4)),
+                        weight_decay=float(exp_cfg["defaults"].get("weight_decay", 1e-5)),
+                    )
+                    scaler = torch.amp.GradScaler("cuda") if device.type == "cuda" else None
+
+                    evaluator = AnomalyFourClassEvaluator(
+                        model=model,
+                        model_type="lstm_vae",
+                        device=device.type,
+                    )
+
+                    # 2. Checkpoint Save Directory with LOGO Tag
+                    experiment_tag = exp_cfg.get("experiment_tag", "standard_training")
+                    save_dir = checkpoint_base_dir / experiment_tag / f"{evaluator.model_type}_{run_identifier}"
+                    save_dir.mkdir(parents=True, exist_ok=True)
+                    
+                    logger.info(f"Saving checkpoints to: {save_dir}")
+
+                    # =====================================================================
+                    # Measure Static Model Complexity (Before Epoch Loop)
+                    # =====================================================================
+                    # Take a single sample window from train_loader for shape probing
+                    sample_batch = next(iter(train_loader))
+                    sample_x = sample_batch[0][:1]  # Shape: (1, seq_len, num_features)
+
+                    complexity_info = measure_model_complexity(model, sample_x)
+                    inference_latency_ms = measure_inference_latency(model, sample_x)
+
+                    # Reset peak GPU memory stats before training begins
+                    if torch.cuda.is_available():
+                        torch.cuda.reset_peak_memory_stats()
+
+                    # Metrics history container
+                    metrics_history = []
+
+                    for epoch in range(1, epochs + 1):
+                        # Synchronize and start timer for epoch throughput calculation
+                        if torch.cuda.is_available():
+                            torch.cuda.synchronize()
+                        epoch_start_time = time.perf_counter()
+
+                        start_time = time.time()
+                        avg_train_loss = train_lstm_vae_epoch(model, train_loader, optimizer, beta, scaler, device)
+                        elapsed = time.time() - start_time
+
+                        # Fast evaluation during training loop (no autograd, no cuDNN errors)
+                        val_metrics = evaluator.get_metrics(val_loader, compute_gradients=False)
+                        current_pr_auc = val_metrics["PR-AUC"]
+
+                        if torch.cuda.is_available():
+                                torch.cuda.synchronize()
+                        epoch_duration_sec = time.perf_counter() - epoch_start_time
+
+                        # Calculate throughput (samples / sec)
+                        total_samples = len(train_loader.dataset)
+                        throughput = total_samples / epoch_duration_sec if epoch_duration_sec > 0 else 0.0
+
+                        # Capture Peak VRAM usage
+                        peak_vram_gb = (
+                            torch.cuda.max_memory_allocated() / (1024 ** 3) 
+                            if torch.cuda.is_available() else 0.0
                         )
-                        logger.info(f"  ⭐️ New best LSTM-VAE PR-AUC saved: {best_pr_auc:.4f}")
 
-                    metrics_history.append({
-                        "epoch": epoch,
-                        "model_type": evaluator.model_type,
-                        "feature_mask": mask_name,
-                        "logo_mask": logo_mask or "none",
-                        "run_identifier": run_identifier,
-                        # Core Summary
-                        "train_loss": avg_train_loss,
-                        "val_pr_auc": val_metrics.get("PR-AUC", 0.0),
-                        "val_auroc": val_metrics.get("AUROC", 0.0),
-                        "val_f1_binary": val_metrics.get("F1_Binary", 0.0),
-                        "val_f1_macro": val_metrics.get("F1_Macro", 0.0),
-                        # Operational & Convergence Metrics
-                        "calibrated_tau": val_metrics.get("Calibrated_Tau", 0.0),
-                        "precision": val_metrics.get("Prec", 0.0),
-                        "recall": val_metrics.get("Rec", 0.0),
-                        "fpr": val_metrics.get("FPR", 0.0),
-                        "fnr": val_metrics.get("FNR", 0.0),
-                        # Count Metrics for Convergence Tracking
-                        "tp_count": val_metrics.get("TP", 0),
-                        "fp_count": val_metrics.get("FP", 0),
-                        "tn_count": val_metrics.get("TN", 0),
-                        "fn_count": val_metrics.get("FN", 0),
-                        "total_detected_anomalies": val_metrics.get("TP", 0) + val_metrics.get("FP", 0),
-                        # Computational Metrics
-                        "params_m": complexity_info["params_m"],
-                        "forward_gflops": complexity_info["gflops"],
-                        "inference_latency_ms": inference_latency_ms,
-                        "epoch_duration_sec": epoch_duration_sec,
-                        "throughput_samples_per_sec": throughput,
-                        "peak_vram_gb": peak_vram_gb,
-                    })
+                        logger.info(
+                            f"Epoch {epoch:02d}/{epochs:02d} | Train Loss: {avg_train_loss:.6f} | "
+                            f"Val AUROC: {val_metrics['AUROC']:.4f} | Val PR-AUC: {current_pr_auc:.4f} | "
+                            f"Val F1_Macro: {val_metrics['F1_Macro']:.4f} | Val F1_Binary: {val_metrics['F1_Binary']:.4f} | "
+                            f"Time: {epoch_duration_sec:.2f}s | Throughput: {throughput:.2f} samples/sec | Peak VRAM: {peak_vram_gb:.2f} GB"
+                        )
 
-                # Save structured history alongside best model checkpoint
-                history_path = save_dir / "training_history.json"
-                with open(history_path, "w") as f:
-                    json.dump(metrics_history, f, indent=2, cls=NpEncoder)
+                        # 2. Update Early Stopper and Check Best Score
+                        is_early_stop = early_stopper(current_pr_auc)
+                        
+                        if early_stopper.counter == 0:  # New best score found (counter resets to 0)
+                            save_checkpoint_and_metrics(
+                                    save_dir=save_dir,
+                                    filename="best_model.pt",
+                                    epoch=epoch,
+                                    model=model,
+                                    optimizer=optimizer,
+                                    scheduler=None,  # Pass None if no scheduler
+                                    best_val_pr_auc=early_stopper.best_metric_val,
+                                    train_loss=avg_train_loss,
+                                    val_metrics=val_metrics,
+                                    complexity_info=complexity_info,
+                                    inference_latency_ms=inference_latency_ms,
+                                    epoch_duration_sec=epoch_duration_sec,
+                                    throughput=throughput,
+                                    peak_vram_gb=peak_vram_gb,
+                                    run_identifier=run_identifier,
+                                    mask_name=mask_name,
+                                    logo_mask=logo_mask,
+                            )
+                            logger.info(f"  ⭐️ New best LSTM-VAE PR-AUC saved: {early_stopper.best_metric_val:.4f}")
 
-            except Exception as e:
-                    logger.error(f"[ERROR] Pipeline run failed: {e}")
-                    raise e  # Re-raise or handle as needed for sweep tracking
+                        metrics_history.append({
+                            "epoch": epoch,
+                            "model_type": evaluator.model_type,
+                            "feature_mask": mask_name,
+                            "logo_mask": logo_mask or "none",
+                            "run_identifier": run_identifier,
+                            # Core Summary
+                            "train_loss": avg_train_loss,
+                            "val_pr_auc": val_metrics.get("PR-AUC", 0.0),
+                            "val_auroc": val_metrics.get("AUROC", 0.0),
+                            "val_f1_binary": val_metrics.get("F1_Binary", 0.0),
+                            "val_f1_macro": val_metrics.get("F1_Macro", 0.0),
+                            # Operational & Convergence Metrics
+                            "calibrated_tau": val_metrics.get("Calibrated_Tau", 0.0),
+                            "precision": val_metrics.get("Prec", 0.0),
+                            "recall": val_metrics.get("Rec", 0.0),
+                            "fpr": val_metrics.get("FPR", 0.0),
+                            "fnr": val_metrics.get("FNR", 0.0),
+                            # Count Metrics for Convergence Tracking
+                            "tp_count": val_metrics.get("TP", 0),
+                            "fp_count": val_metrics.get("FP", 0),
+                            "tn_count": val_metrics.get("TN", 0),
+                            "fn_count": val_metrics.get("FN", 0),
+                            "total_detected_anomalies": val_metrics.get("TP", 0) + val_metrics.get("FP", 0),
+                            # Computational Metrics
+                            "params_m": complexity_info["params_m"],
+                            "forward_gflops": complexity_info["gflops"],
+                            "inference_latency_ms": inference_latency_ms,
+                            "epoch_duration_sec": epoch_duration_sec,
+                            "throughput_samples_per_sec": throughput,
+                            "peak_vram_gb": peak_vram_gb,
+                        })
 
-            finally:
-                # Executes unconditionally whether the run succeeds or crashes
-                cleanup_pipeline_resources(
-                    model, 
-                    optimizer, 
-                    train_loader, 
-                    val_loader, 
-                    evaluator
-                )
-                model = optimizer = train_loader = val_loader = evaluator = None
+
+                        # 3. Check Early Stopping Condition to Break Loop
+                        if is_early_stop:
+                            logger.info(f"\n✋ Early stopping triggered at Epoch {epoch:02d}. Advancing to next model...")
+                            break
+
+                    # Save structured history alongside best model checkpoint
+                    history_path = save_dir / "training_history.json"
+                    with open(history_path, "w") as f:
+                        json.dump(metrics_history, f, indent=2, cls=NpEncoder)
+
+                except Exception as e:
+                        logger.error(f"[ERROR] Pipeline run failed: {e}")
+                        raise e  # Re-raise or handle as needed for sweep tracking
+
+                finally:
+                    # Executes unconditionally whether the run succeeds or crashes
+                    cleanup_pipeline_resources(
+                        model, 
+                        optimizer, 
+                        train_loader, 
+                        val_loader, 
+                        evaluator
+                    )
+                    model = optimizer = train_loader = val_loader = evaluator = None
 
 
 def train_at_epoch(model, dataloader, optimizer, criterion, k_lambda, device) -> float:
@@ -910,6 +947,10 @@ def train_at_epoch(model, dataloader, optimizer, criterion, k_lambda, device) ->
 def run_at_pipeline(exp_config_path: str):
     env = LoadEnvironment()
     exp_cfg = load_yaml_config(exp_config_path)
+    data_fractions = exp_cfg.get("data_fractions", [1.0]) # Default to full dataset if omitted
+
+    if not isinstance(data_fractions, list):
+        data_fractions = [data_fractions]
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     if device.type == "cuda":
@@ -944,212 +985,224 @@ def run_at_pipeline(exp_config_path: str):
 
     for mask_name in feature_masks:
         for logo_mask in train_logo_masks:
-            # Build descriptive directory name: e.g., omni_enabled_baseline_logo_acc
-            logo_tag = f"_logo_{logo_mask}" if logo_mask else ""
-            run_identifier = f"{mask_name}{logo_tag}"
+            for fraction in data_fractions:
+                # Build descriptive directory name: e.g., omni_enabled_baseline_logo_acc
+                logo_tag = f"_logo_{logo_mask}" if logo_mask else ""
+                frac_tag = f"_frac_{int(fraction * 100)}" if fraction < 1.0 else ""
+                run_identifier = f"{mask_name}{logo_tag}{frac_tag}"
 
-            logger.info(
-                f"\n================ MASK: {mask_name} | TRAIN LOGO: {logo_mask or 'NONE'} ================"
-            )
-
-            at_model = optimizer = train_loader = val_loader = evaluator = None
-            try:
-
-                # 1. Datasets & Loaders
-                train_ds = AviationFourClassDataset(
-                    manifest_dir=env.DATABASE_DIR / "manifests",
-                    database_dir=env.DATABASE_DIR,
-                    stats_path=env.DATABASE_DIR / "metadata" / "train_split_stats.json",
-                    split="train",
-                    feature_set=mask_name,
-                    logo_mask_col=logo_mask,
-                )
-                val_ds = AviationFourClassDataset(
-                    manifest_dir=env.DATABASE_DIR / "manifests",
-                    database_dir=env.DATABASE_DIR,
-                    stats_path=env.DATABASE_DIR / "metadata" / "train_split_stats.json",
-                    split="val",
-                    feature_set=mask_name,
-                    logo_mask_col=logo_mask,
+                logger.info(
+                    f"\n================ MASK: {mask_name} | TRAIN LOGO: {logo_mask or 'NONE'} ================"
                 )
 
-                nominal_train_subset = train_ds.get_nominal_subset()
-                train_loader = DataLoader(
-                    nominal_train_subset,
-                    batch_size=exp_cfg["defaults"]["batch_size"],
-                    shuffle=True,
-                    num_workers=exp_cfg["defaults"].get("num_workers", 4),
-                    pin_memory=True,
-                    worker_init_fn=seed_worker,
-                    generator=g,
-                )
-                val_loader = DataLoader(
-                    val_ds,
-                    batch_size=exp_cfg["defaults"]["batch_size"],
-                    shuffle=False,
-                    num_workers=exp_cfg["defaults"].get("num_workers", 4),
-                    pin_memory=True,
-                    worker_init_fn=seed_worker,
-                    generator=g,
-                )
-
-                # 2. Instantiate Anomaly Transformer Model
-                at_model = AnomalyTransformer(
-                    win_size=train_ds.window_size,
-                    enc_in=train_ds.num_channels,
-                    c_out=train_ds.num_channels,
-                    d_model=model_cfg.get("d_model", 128),
-                    n_heads=model_cfg.get("n_heads", 8),
-                    e_layers=model_cfg.get("e_layers", 3),
-                    d_ff=model_cfg.get("d_ff", 256),
-                    dropout=model_cfg.get("dropout", 0.1),
-                    output_attention=True,
-                ).to(device)
-
-                optimizer = torch.optim.AdamW(
-                    at_model.parameters(),
-                    lr=float(exp_cfg["defaults"].get("learning_rate", 1e-4)),
-                    weight_decay=float(exp_cfg["defaults"].get("weight_decay", 1e-5)),
-                )
-                criterion = nn.MSELoss()
-
-                # Instantiate AnomalyFourClassEvaluator for validation monitoring
-                evaluator = AnomalyFourClassEvaluator(
-                    model=at_model,
-                    model_type="anomaly_transformer",
-                    device=device.type,
-                )
-
-                # 2. Checkpoint Save Directory with LOGO Tag
-                save_dir = checkpoint_base_dir / f"{evaluator.model_type}_{run_identifier}"
-                save_dir.mkdir(parents=True, exist_ok=True)
-                
-                logger.info(f"Saving checkpoints to: {save_dir}")
-
-                best_pr_auc = 0.0
-                # Fallback hierarchy: model-specific epoch -> global default epoch -> hardcoded fallback
-                epochs = model_cfg.get("epochs", exp_cfg["defaults"].get("epochs", 30))
-
-                # =====================================================================
-                # Measure Static Model Complexity (Before Epoch Loop)
-                # =====================================================================
-                # Take a single sample window from train_loader for shape probing
-                sample_batch = next(iter(train_loader))
-                sample_x = sample_batch[0][:1]  # Shape: (1, seq_len, num_features)
-
-                complexity_info = measure_model_complexity(at_model, sample_x)
-                inference_latency_ms = measure_inference_latency(at_model, sample_x)
-
-                # Reset peak GPU memory stats before training begins
-                if torch.cuda.is_available():
-                    torch.cuda.reset_peak_memory_stats()
-
-                # Metrics history container
-                metrics_history = []
-
-                for epoch in range(1, epochs + 1):
-                    # Synchronize and start timer for epoch throughput calculation
-                    if torch.cuda.is_available():
-                        torch.cuda.synchronize()
-                    epoch_start_time = time.perf_counter()
-
-                    start_time = time.time()
-                    avg_train_loss = train_at_epoch(at_model, train_loader, optimizer, criterion, k_lambda, device)
-                    elapsed = time.time() - start_time
-
-                    # Validation evaluation
-                    val_metrics = evaluator.get_metrics(val_loader, compute_gradients=False)
-                    current_pr_auc = val_metrics["PR-AUC"]
-
-                    if torch.cuda.is_available():
-                            torch.cuda.synchronize()
-                    epoch_duration_sec = time.perf_counter() - epoch_start_time
-
-                    # Calculate throughput (samples / sec)
-                    total_samples = len(train_loader.dataset)
-                    throughput = total_samples / epoch_duration_sec if epoch_duration_sec > 0 else 0.0
-
-                    # Capture Peak VRAM usage
-                    peak_vram_gb = (
-                        torch.cuda.max_memory_allocated() / (1024 ** 3) 
-                        if torch.cuda.is_available() else 0.0
-                    )
-
-                    logger.info(
-                        f"Epoch {epoch:02d}/{epochs:02d} | Train Loss: {avg_train_loss:.6f} | "
-                        f"Val AUROC: {val_metrics['AUROC']:.4f} | Val PR-AUC: {current_pr_auc:.4f} | "
-                        f"Val F1_Macro: {val_metrics['F1_Macro']:.4f} | Val F1_Binary: {val_metrics['F1_Binary']:.4f} | "
-                        f"Time: {epoch_duration_sec:.2f}s | Throughput: {throughput:.2f} samples/sec | Peak VRAM: {peak_vram_gb:.2f} GB"
-                    )
-
-                    # Checkpoint best model based on Val PR-AUC
-                    if current_pr_auc > best_pr_auc:
-                        best_pr_auc = current_pr_auc
-                        save_checkpoint_and_metrics(
-                                save_dir=save_dir,
-                                filename="best_model.pt",
-                                epoch=epoch,
-                                model=at_model,
-                                optimizer=optimizer,
-                                scheduler=None,  # Pass None if no scheduler
-                                best_val_pr_auc=best_pr_auc,
-                                train_loss=avg_train_loss,
-                                val_metrics=val_metrics,
-                                complexity_info=complexity_info,
-                                inference_latency_ms=inference_latency_ms,
-                                epoch_duration_sec=epoch_duration_sec,
-                                throughput=throughput,
-                                peak_vram_gb=peak_vram_gb,
-                                run_identifier=run_identifier,
-                                mask_name=mask_name,
-                                logo_mask=logo_mask,
-                        )
-                        logger.info(f"  ⭐️ New best Anomaly Transformer PR-AUC saved: {best_pr_auc:.4f}")
-
-                    metrics_history.append({
-                            "epoch": epoch,
-                            "model_type": evaluator.model_type,
-                            "feature_mask": mask_name,
-                            "logo_mask": logo_mask or "none",
-                            "run_identifier": run_identifier,
-                            # Core Summary
-                            "train_loss": avg_train_loss,
-                            "val_pr_auc": val_metrics["PR-AUC"],
-                            "val_auroc": val_metrics["AUROC"],
-                            "val_f1_binary": val_metrics["F1_Binary"],
-                            "val_f1_macro": val_metrics["F1_Macro"],
-                            # Operational & Convergence Metrics
-                            "calibrated_tau": val_metrics.get("Calibrated_Tau", None),
-                            "precision": val_metrics["Prec"],
-                            "recall": val_metrics["Rec"],
-                            "fpr": val_metrics["FPR"],
-                            "fnr": val_metrics.get("FNR", 0.0),
-                            # Count Metrics for Convergence Tracking
-                            "tp_count": val_metrics["TP"],
-                            "fp_count": val_metrics["FP"],
-                            "total_detected_anomalies": val_metrics["TP"] + val_metrics["FP"],
-                        })
-
-                # Save structured history alongside best model checkpoint
-                history_path = save_dir / "training_history.json"
-                with open(history_path, "w") as f:
-                    json.dump(metrics_history, f, indent=2, cls=NpEncoder)
-
-            except Exception as e:
-                    logger.error(f"[ERROR] Pipeline run failed: {e}")
-                    raise e  # Re-raise or handle as needed for sweep tracking
-
-            finally:
-            
-                # Executes unconditionally whether the run succeeds or crashes
-                cleanup_pipeline_resources(
-                    at_model, 
-                    optimizer, 
-                    train_loader, 
-                    val_loader, 
-                    evaluator
-                )
                 at_model = optimizer = train_loader = val_loader = evaluator = None
+                try:
+
+                    # 1. Datasets & Loaders
+                    train_ds = AviationFourClassDataset(
+                        manifest_dir=env.DATABASE_DIR / "manifests",
+                        database_dir=env.DATABASE_DIR,
+                        stats_path=env.DATABASE_DIR / "metadata" / "train_split_stats.json",
+                        split="train",
+                        feature_set=mask_name,
+                        logo_mask_col=logo_mask,
+                    )
+                    val_ds = AviationFourClassDataset(
+                        manifest_dir=env.DATABASE_DIR / "manifests",
+                        database_dir=env.DATABASE_DIR,
+                        stats_path=env.DATABASE_DIR / "metadata" / "train_split_stats.json",
+                        split="val",
+                        feature_set=mask_name,
+                        logo_mask_col=logo_mask,
+                    )
+
+                    nominal_train_subset = train_ds.get_nominal_subset()
+                    train_loader = DataLoader(
+                        nominal_train_subset,
+                        batch_size=exp_cfg["defaults"]["batch_size"],
+                        shuffle=True,
+                        num_workers=exp_cfg["defaults"].get("num_workers", 4),
+                        pin_memory=True,
+                        worker_init_fn=seed_worker,
+                        generator=g,
+                    )
+                    val_loader = DataLoader(
+                        val_ds,
+                        batch_size=exp_cfg["defaults"]["batch_size"],
+                        shuffle=False,
+                        num_workers=exp_cfg["defaults"].get("num_workers", 4),
+                        pin_memory=True,
+                        worker_init_fn=seed_worker,
+                        generator=g,
+                    )
+
+                    # 2. Instantiate Anomaly Transformer Model
+                    at_model = AnomalyTransformer(
+                        win_size=train_ds.window_size,
+                        enc_in=train_ds.num_channels,
+                        c_out=train_ds.num_channels,
+                        d_model=model_cfg.get("d_model", 128),
+                        n_heads=model_cfg.get("n_heads", 8),
+                        e_layers=model_cfg.get("e_layers", 3),
+                        d_ff=model_cfg.get("d_ff", 256),
+                        dropout=model_cfg.get("dropout", 0.1),
+                        output_attention=True,
+                    ).to(device)
+
+                    optimizer = torch.optim.AdamW(
+                        at_model.parameters(),
+                        lr=float(exp_cfg["defaults"].get("learning_rate", 1e-4)),
+                        weight_decay=float(exp_cfg["defaults"].get("weight_decay", 1e-5)),
+                    )
+                    criterion = nn.MSELoss()
+
+                    # Instantiate AnomalyFourClassEvaluator for validation monitoring
+                    evaluator = AnomalyFourClassEvaluator(
+                        model=at_model,
+                        model_type="anomaly_transformer",
+                        device=device.type,
+                    )
+
+                    # 2. Checkpoint Save Directory with LOGO Tag
+                    experiment_tag = exp_cfg.get("experiment_tag", "standard_training")
+                    save_dir = checkpoint_base_dir / experiment_tag / f"{evaluator.model_type}_{run_identifier}"
+                    save_dir.mkdir(parents=True, exist_ok=True)
+                    
+                    logger.info(f"Saving checkpoints to: {save_dir}")
+
+                    # 1. Initialize Early Stopping before epoch loop
+                    patience = exp_cfg.get("defaults", {}).get("patience", 10)
+                    patience_delta = exp_cfg.get("defaults", {}).get("patience_delta", 0.0005)
+                    early_stopper = EarlyStopping(patience=patience, delta=patience_delta, mode="max")
+                    # Fallback hierarchy: model-specific epoch -> global default epoch -> hardcoded fallback
+                    epochs = model_cfg.get("epochs", exp_cfg["defaults"].get("epochs", 30))
+
+                    # =====================================================================
+                    # Measure Static Model Complexity (Before Epoch Loop)
+                    # =====================================================================
+                    # Take a single sample window from train_loader for shape probing
+                    sample_batch = next(iter(train_loader))
+                    sample_x = sample_batch[0][:1]  # Shape: (1, seq_len, num_features)
+
+                    complexity_info = measure_model_complexity(at_model, sample_x)
+                    inference_latency_ms = measure_inference_latency(at_model, sample_x)
+
+                    # Reset peak GPU memory stats before training begins
+                    if torch.cuda.is_available():
+                        torch.cuda.reset_peak_memory_stats()
+
+                    # Metrics history container
+                    metrics_history = []
+
+                    for epoch in range(1, epochs + 1):
+                        # Synchronize and start timer for epoch throughput calculation
+                        if torch.cuda.is_available():
+                            torch.cuda.synchronize()
+                        epoch_start_time = time.perf_counter()
+
+                        start_time = time.time()
+                        avg_train_loss = train_at_epoch(at_model, train_loader, optimizer, criterion, k_lambda, device)
+                        elapsed = time.time() - start_time
+
+                        # Validation evaluation
+                        val_metrics = evaluator.get_metrics(val_loader, compute_gradients=False)
+                        current_pr_auc = val_metrics["PR-AUC"]
+
+                        if torch.cuda.is_available():
+                                torch.cuda.synchronize()
+                        epoch_duration_sec = time.perf_counter() - epoch_start_time
+
+                        # Calculate throughput (samples / sec)
+                        total_samples = len(train_loader.dataset)
+                        throughput = total_samples / epoch_duration_sec if epoch_duration_sec > 0 else 0.0
+
+                        # Capture Peak VRAM usage
+                        peak_vram_gb = (
+                            torch.cuda.max_memory_allocated() / (1024 ** 3) 
+                            if torch.cuda.is_available() else 0.0
+                        )
+
+                        logger.info(
+                            f"Epoch {epoch:02d}/{epochs:02d} | Train Loss: {avg_train_loss:.6f} | "
+                            f"Val AUROC: {val_metrics['AUROC']:.4f} | Val PR-AUC: {current_pr_auc:.4f} | "
+                            f"Val F1_Macro: {val_metrics['F1_Macro']:.4f} | Val F1_Binary: {val_metrics['F1_Binary']:.4f} | "
+                            f"Time: {epoch_duration_sec:.2f}s | Throughput: {throughput:.2f} samples/sec | Peak VRAM: {peak_vram_gb:.2f} GB"
+                        )
+
+                        # 2. Update Early Stopper and Check Best Score
+                        is_early_stop = early_stopper(current_pr_auc)
+                        
+                        if early_stopper.counter == 0:
+                            best_pr_auc = current_pr_auc
+                            save_checkpoint_and_metrics(
+                                    save_dir=save_dir,
+                                    filename="best_model.pt",
+                                    epoch=epoch,
+                                    model=at_model,
+                                    optimizer=optimizer,
+                                    scheduler=None,  # Pass None if no scheduler
+                                    best_val_pr_auc=best_pr_auc,
+                                    train_loss=avg_train_loss,
+                                    val_metrics=val_metrics,
+                                    complexity_info=complexity_info,
+                                    inference_latency_ms=inference_latency_ms,
+                                    epoch_duration_sec=epoch_duration_sec,
+                                    throughput=throughput,
+                                    peak_vram_gb=peak_vram_gb,
+                                    run_identifier=run_identifier,
+                                    mask_name=mask_name,
+                                    logo_mask=logo_mask,
+                            )
+                            logger.info(f"  ⭐️ New best Anomaly Transformer PR-AUC saved: {best_pr_auc:.4f}")
+
+                        metrics_history.append({
+                                "epoch": epoch,
+                                "model_type": evaluator.model_type,
+                                "feature_mask": mask_name,
+                                "logo_mask": logo_mask or "none",
+                                "run_identifier": run_identifier,
+                                # Core Summary
+                                "train_loss": avg_train_loss,
+                                "val_pr_auc": val_metrics["PR-AUC"],
+                                "val_auroc": val_metrics["AUROC"],
+                                "val_f1_binary": val_metrics["F1_Binary"],
+                                "val_f1_macro": val_metrics["F1_Macro"],
+                                # Operational & Convergence Metrics
+                                "calibrated_tau": val_metrics.get("Calibrated_Tau", None),
+                                "precision": val_metrics["Prec"],
+                                "recall": val_metrics["Rec"],
+                                "fpr": val_metrics["FPR"],
+                                "fnr": val_metrics.get("FNR", 0.0),
+                                # Count Metrics for Convergence Tracking
+                                "tp_count": val_metrics["TP"],
+                                "fp_count": val_metrics["FP"],
+                                "total_detected_anomalies": val_metrics["TP"] + val_metrics["FP"],
+                            })
+                        # 3. Check Early Stopping Condition to Break Loop
+                        if is_early_stop:
+                            logger.info(f"\n✋ Early stopping triggered at Epoch {epoch:02d}. Advancing to next model...")
+                            break
+
+                    # Save structured history alongside best model checkpoint
+                    history_path = save_dir / "training_history.json"
+                    with open(history_path, "w") as f:
+                        json.dump(metrics_history, f, indent=2, cls=NpEncoder)
+
+                except Exception as e:
+                        logger.error(f"[ERROR] Pipeline run failed: {e}")
+                        raise e  # Re-raise or handle as needed for sweep tracking
+
+                finally:
+                
+                    # Executes unconditionally whether the run succeeds or crashes
+                    cleanup_pipeline_resources(
+                        at_model, 
+                        optimizer, 
+                        train_loader, 
+                        val_loader, 
+                        evaluator
+                    )
+                    at_model = optimizer = train_loader = val_loader = evaluator = None
 
 def train_patchtst_epoch(model, dataloader, optimizer, criterion, scaler, patch_len, stride, device) -> float:
     """Executes single training epoch with unfold patching and PyTorch AMP."""
@@ -1186,6 +1239,10 @@ def train_patchtst_epoch(model, dataloader, optimizer, criterion, scaler, patch_
 def run_patchtst_pipeline(exp_config_path: str):
     env = LoadEnvironment()
     exp_cfg = load_yaml_config(exp_config_path)
+    data_fractions = exp_cfg.get("data_fractions", [1.0]) # Default to full dataset if omitted
+
+    if not isinstance(data_fractions, list):
+        data_fractions = [data_fractions]
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     if device.type == "cuda":
@@ -1221,241 +1278,254 @@ def run_patchtst_pipeline(exp_config_path: str):
 
     for mask_name in feature_masks:
         for logo_mask in train_logo_masks:
-            # Build descriptive directory name: e.g., omni_enabled_baseline_logo_acc
-            logo_tag = f"_logo_{logo_mask}" if logo_mask else ""
-            run_identifier = f"{mask_name}{logo_tag}"
-
-            logger.info(
-                f"\n================ MASK: {mask_name} | TRAIN LOGO: {logo_mask or 'NONE'} ================"
-            )
-
-            patch_model = optimizer = train_loader = val_loader = evaluator = None
-            try: 
-
-                # 1. Datasets & Loaders
-                train_ds = AviationFourClassDataset(
-                    manifest_dir=env.DATABASE_DIR / "manifests",
-                    database_dir=env.DATABASE_DIR,
-                    stats_path=env.DATABASE_DIR / "metadata" / "train_split_stats.json",
-                    split="train",
-                    feature_set=mask_name,
-                    logo_mask_col=logo_mask,
-                )
-                val_ds = AviationFourClassDataset(
-                    manifest_dir=env.DATABASE_DIR / "manifests",
-                    database_dir=env.DATABASE_DIR,
-                    stats_path=env.DATABASE_DIR / "metadata" / "train_split_stats.json",
-                    split="val",
-                    feature_set=mask_name,
-                    logo_mask_col=logo_mask,
-                )
-
-                nominal_train_subset = train_ds.get_nominal_subset()
-                train_loader = DataLoader(
-                    nominal_train_subset,
-                    batch_size=exp_cfg["defaults"]["batch_size"],
-                    shuffle=True,
-                    num_workers=exp_cfg["defaults"].get("num_workers", 4),
-                    pin_memory=True,
-                    worker_init_fn=seed_worker,
-                    generator=g,
-                )
-                val_loader = DataLoader(
-                    val_ds,
-                    batch_size=exp_cfg["defaults"]["batch_size"],
-                    shuffle=False,
-                    num_workers=exp_cfg["defaults"].get("num_workers", 4),
-                    pin_memory=True,
-                    worker_init_fn=seed_worker,
-                    generator=g,
-                )
-
-                # 2. Dynamic Patch Count Calculation
-                window_size = train_ds.window_size
-                num_patch = (window_size - patch_len) // stride + 1
+            for fraction in data_fractions:
+                # Build descriptive directory name: e.g., omni_enabled_baseline_logo_acc
+                logo_tag = f"_logo_{logo_mask}" if logo_mask else ""
+                frac_tag = f"_frac_{int(fraction * 100)}" if fraction < 1.0 else ""
+                run_identifier = f"{mask_name}{logo_tag}{frac_tag}"
 
                 logger.info(
-                    f"🚀 Training PatchTST on [{mask_name}] | Window: {window_size} | "
-                    f"Channels: {train_ds.num_channels} | Patches: {num_patch}"
+                    f"\n================ MASK: {mask_name} | TRAIN LOGO: {logo_mask or 'NONE'} ================"
                 )
 
-                # 3. Instantiate PatchTST
-                patch_model = PatchTST(
-                    c_in=train_ds.num_channels,
-                    target_dim=window_size,
-                    patch_len=patch_len,
-                    stride=stride,
-                    num_patch=num_patch,
-                    head_type="pretrain",
-                    d_model=model_cfg.get("d_model", 128),
-                    n_layers=model_cfg.get("n_layers", 3),
-                    n_heads=model_cfg.get("n_heads", 16),
-                    dropout=model_cfg.get("dropout", 0.1),
-                    attn_dropout=model_cfg.get("attn_dropout", 0.1),
-                    head_dropout=model_cfg.get("head_dropout", 0.2),
-                ).to(device)
+                patch_model = optimizer = train_loader = val_loader = evaluator = None
+                try: 
 
-                optimizer = torch.optim.AdamW(
-                    patch_model.parameters(),
-                    lr=float(exp_cfg["defaults"].get("learning_rate", 1e-4)),
-                    weight_decay=float(exp_cfg["defaults"].get("weight_decay", 1e-5)),
-                )
-                criterion = nn.MSELoss()
-                scaler = torch.amp.GradScaler("cuda") if device.type == "cuda" else None
-
-                # Instantiate AnomalyFourClassEvaluator for validation monitoring
-                evaluator = AnomalyFourClassEvaluator(
-                    model=patch_model,
-                    model_type="patchtst",
-                    device=device.type,
-                    patch_len=patch_len,
-                    stride=stride,
-                )
-
-                # 2. Checkpoint Save Directory with LOGO Tag
-                save_dir = checkpoint_base_dir / f"{evaluator.model_type}_{run_identifier}"
-                save_dir.mkdir(parents=True, exist_ok=True)
-                
-                logger.info(f"Saving checkpoints to: {save_dir}")
-
-                best_pr_auc = 0.0
-                epochs = model_cfg.get("epochs", exp_cfg["defaults"].get("epochs", 30))
-
-                # =====================================================================
-                # Measure Static Model Complexity (Before Epoch Loop)
-                # =====================================================================
-                # Take a single sample window from train_loader for shape probing
-                sample_batch = next(iter(train_loader))
-                sample_x = sample_batch[0][:1]  # Shape: (1, seq_len, num_features)
-
-                # Unfold 3D sample_x to 4D if running PatchTST [bs x num_patch x n_vars x patch_len] for pretrain
-                if evaluator.model_type == "patchtst":
-                    x_raw = sample_x.permute(0, 2, 1)  # [bs, num_features, window_size]
-                    sample_input = x_raw.unfold(dimension=-1, size=patch_len, step=stride).permute(0, 2, 1, 3).contiguous()
-                else:
-                    sample_input = sample_x
-
-                complexity_info = measure_model_complexity(patch_model, sample_input)
-                inference_latency_ms = measure_inference_latency(patch_model, sample_input)
-
-                # Reset peak GPU memory stats before training begins
-                if torch.cuda.is_available():
-                    torch.cuda.reset_peak_memory_stats()
-
-                # Metrics history container
-                metrics_history = []
-                for epoch in range(1, epochs + 1):
-                    # Synchronize and start timer for epoch throughput calculation
-                    if torch.cuda.is_available():
-                        torch.cuda.synchronize()
-                    epoch_start_time = time.perf_counter()
-
-                    start_time = time.time()
-                    avg_train_loss = train_patchtst_epoch(
-                        patch_model, train_loader, optimizer, criterion, scaler, patch_len, stride, device
+                    # 1. Datasets & Loaders
+                    train_ds = AviationFourClassDataset(
+                        manifest_dir=env.DATABASE_DIR / "manifests",
+                        database_dir=env.DATABASE_DIR,
+                        stats_path=env.DATABASE_DIR / "metadata" / "train_split_stats.json",
+                        split="train",
+                        feature_set=mask_name,
+                        logo_mask_col=logo_mask,
                     )
-                    elapsed = time.time() - start_time
-
-                    # Validation metrics computed via evaluator
-                    val_metrics = evaluator.get_metrics(val_loader, compute_gradients=False)
-                    current_pr_auc = val_metrics["PR-AUC"]
-
-                    if torch.cuda.is_available():
-                            torch.cuda.synchronize()
-                    epoch_duration_sec = time.perf_counter() - epoch_start_time
-
-                    # Calculate throughput (samples / sec)
-                    total_samples = len(train_loader.dataset)
-                    throughput = total_samples / epoch_duration_sec if epoch_duration_sec > 0 else 0.0
-
-                    # Capture Peak VRAM usage
-                    peak_vram_gb = (
-                        torch.cuda.max_memory_allocated() / (1024 ** 3) 
-                        if torch.cuda.is_available() else 0.0
+                    val_ds = AviationFourClassDataset(
+                        manifest_dir=env.DATABASE_DIR / "manifests",
+                        database_dir=env.DATABASE_DIR,
+                        stats_path=env.DATABASE_DIR / "metadata" / "train_split_stats.json",
+                        split="val",
+                        feature_set=mask_name,
+                        logo_mask_col=logo_mask,
                     )
+
+                    nominal_train_subset = train_ds.get_nominal_subset()
+                    train_loader = DataLoader(
+                        nominal_train_subset,
+                        batch_size=exp_cfg["defaults"]["batch_size"],
+                        shuffle=True,
+                        num_workers=exp_cfg["defaults"].get("num_workers", 4),
+                        pin_memory=True,
+                        worker_init_fn=seed_worker,
+                        generator=g,
+                    )
+                    val_loader = DataLoader(
+                        val_ds,
+                        batch_size=exp_cfg["defaults"]["batch_size"],
+                        shuffle=False,
+                        num_workers=exp_cfg["defaults"].get("num_workers", 4),
+                        pin_memory=True,
+                        worker_init_fn=seed_worker,
+                        generator=g,
+                    )
+
+                    # 2. Dynamic Patch Count Calculation
+                    window_size = train_ds.window_size
+                    num_patch = (window_size - patch_len) // stride + 1
 
                     logger.info(
-                        f"Epoch {epoch:02d}/{epochs:02d} | Train Loss: {avg_train_loss:.6f} | "
-                        f"Val AUROC: {val_metrics['AUROC']:.4f} | Val PR-AUC: {current_pr_auc:.4f} | "
-                        f"Val F1_Macro: {val_metrics['F1_Macro']:.4f} | Val F1_Binary: {val_metrics['F1_Binary']:.4f} | "
-                        f"Time: {epoch_duration_sec:.2f}s | Throughput: {throughput:.2f} samples/sec | Peak VRAM: {peak_vram_gb:.2f} GB"
+                        f"🚀 Training PatchTST on [{mask_name}] | Window: {window_size} | "
+                        f"Channels: {train_ds.num_channels} | Patches: {num_patch}"
                     )
 
-                    # Checkpoint on best Val PR-AUC
-                    if current_pr_auc > best_pr_auc:
-                        best_pr_auc = current_pr_auc
-                        save_checkpoint_and_metrics(
-                                save_dir=save_dir,
-                                filename="best_model.pt",
-                                epoch=epoch,
-                                model=patch_model,
-                                optimizer=optimizer,
-                                scheduler=None,  # Pass None if no scheduler
-                                best_val_pr_auc=best_pr_auc,
-                                train_loss=avg_train_loss,
-                                val_metrics=val_metrics,
-                                complexity_info=complexity_info,
-                                inference_latency_ms=inference_latency_ms,
-                                epoch_duration_sec=epoch_duration_sec,
-                                throughput=throughput,
-                                peak_vram_gb=peak_vram_gb,
-                                run_identifier=run_identifier,
-                                mask_name=mask_name,
-                                logo_mask=logo_mask,
+                    # 3. Instantiate PatchTST
+                    patch_model = PatchTST(
+                        c_in=train_ds.num_channels,
+                        target_dim=window_size,
+                        patch_len=patch_len,
+                        stride=stride,
+                        num_patch=num_patch,
+                        head_type="pretrain",
+                        d_model=model_cfg.get("d_model", 128),
+                        n_layers=model_cfg.get("n_layers", 3),
+                        n_heads=model_cfg.get("n_heads", 16),
+                        dropout=model_cfg.get("dropout", 0.1),
+                        attn_dropout=model_cfg.get("attn_dropout", 0.1),
+                        head_dropout=model_cfg.get("head_dropout", 0.2),
+                    ).to(device)
+
+                    optimizer = torch.optim.AdamW(
+                        patch_model.parameters(),
+                        lr=float(exp_cfg["defaults"].get("learning_rate", 1e-4)),
+                        weight_decay=float(exp_cfg["defaults"].get("weight_decay", 1e-5)),
+                    )
+                    criterion = nn.MSELoss()
+                    scaler = torch.amp.GradScaler("cuda") if device.type == "cuda" else None
+
+                    # Instantiate AnomalyFourClassEvaluator for validation monitoring
+                    evaluator = AnomalyFourClassEvaluator(
+                        model=patch_model,
+                        model_type="patchtst",
+                        device=device.type,
+                        patch_len=patch_len,
+                        stride=stride,
+                    )
+
+                    # 2. Checkpoint Save Directory with LOGO Tag
+                    experiment_tag = exp_cfg.get("experiment_tag", "standard_training")
+                    save_dir = checkpoint_base_dir / experiment_tag / f"{evaluator.model_type}_{run_identifier}"
+                    save_dir.mkdir(parents=True, exist_ok=True)
+                    
+                    logger.info(f"Saving checkpoints to: {save_dir}")
+
+                    # 1. Initialize Early Stopping before epoch loop
+                    patience = exp_cfg.get("defaults", {}).get("patience", 10)
+                    patience_delta = exp_cfg.get("defaults", {}).get("patience_delta", 0.0005)
+                    early_stopper = EarlyStopping(patience=patience, delta=patience_delta, mode="max")
+                    epochs = model_cfg.get("epochs", exp_cfg["defaults"].get("epochs", 100))
+
+                    # =====================================================================
+                    # Measure Static Model Complexity (Before Epoch Loop)
+                    # =====================================================================
+                    # Take a single sample window from train_loader for shape probing
+                    sample_batch = next(iter(train_loader))
+                    sample_x = sample_batch[0][:1]  # Shape: (1, seq_len, num_features)
+
+                    # Unfold 3D sample_x to 4D if running PatchTST [bs x num_patch x n_vars x patch_len] for pretrain
+                    if evaluator.model_type == "patchtst":
+                        x_raw = sample_x.permute(0, 2, 1)  # [bs, num_features, window_size]
+                        sample_input = x_raw.unfold(dimension=-1, size=patch_len, step=stride).permute(0, 2, 1, 3).contiguous()
+                    else:
+                        sample_input = sample_x
+
+                    complexity_info = measure_model_complexity(patch_model, sample_input)
+                    inference_latency_ms = measure_inference_latency(patch_model, sample_input)
+
+                    # Reset peak GPU memory stats before training begins
+                    if torch.cuda.is_available():
+                        torch.cuda.reset_peak_memory_stats()
+
+                    # Metrics history container
+                    metrics_history = []
+                    for epoch in range(1, epochs + 1):
+                        # Synchronize and start timer for epoch throughput calculation
+                        if torch.cuda.is_available():
+                            torch.cuda.synchronize()
+                        epoch_start_time = time.perf_counter()
+
+                        start_time = time.time()
+                        avg_train_loss = train_patchtst_epoch(
+                            patch_model, train_loader, optimizer, criterion, scaler, patch_len, stride, device
                         )
-                        logger.info(f"  ⭐️ New best PatchTST PR-AUC saved: {best_pr_auc:.4f}")
+                        elapsed = time.time() - start_time
 
-                    metrics_history.append({
-                        "epoch": epoch,
-                        "model_type": evaluator.model_type,
-                        "feature_mask": mask_name,
-                        "logo_mask": logo_mask or "none",
-                        "run_identifier": run_identifier,
-                        # Core Summary
-                        "train_loss": avg_train_loss,
-                        "val_pr_auc": val_metrics.get("PR-AUC", 0.0),
-                        "val_auroc": val_metrics.get("AUROC", 0.0),
-                        "val_f1_binary": val_metrics.get("F1_Binary", 0.0),
-                        "val_f1_macro": val_metrics.get("F1_Macro", 0.0),
-                        # Operational & Convergence Metrics
-                        "calibrated_tau": val_metrics.get("Calibrated_Tau", 0.0),
-                        "precision": val_metrics.get("Prec", 0.0),
-                        "recall": val_metrics.get("Rec", 0.0),
-                        "fpr": val_metrics.get("FPR", 0.0),
-                        "fnr": val_metrics.get("FNR", 0.0),
-                        # Count Metrics for Convergence Tracking
-                        "tp_count": val_metrics.get("TP", 0),
-                        "fp_count": val_metrics.get("FP", 0),
-                        "tn_count": val_metrics.get("TN", 0),
-                        "fn_count": val_metrics.get("FN", 0),
-                        "total_detected_anomalies": val_metrics.get("TP", 0) + val_metrics.get("FP", 0),
-                        # Computational Metrics
-                        "params_m": complexity_info["params_m"],
-                        "forward_gflops": complexity_info["gflops"],
-                        "inference_latency_ms": inference_latency_ms,
-                        "epoch_duration_sec": epoch_duration_sec,
-                        "throughput_samples_per_sec": throughput,
-                        "peak_vram_gb": peak_vram_gb,
-                    })
+                        # Validation metrics computed via evaluator
+                        val_metrics = evaluator.get_metrics(val_loader, compute_gradients=False)
+                        current_pr_auc = val_metrics["PR-AUC"]
 
-                # Save structured history alongside best model checkpoint
-                history_path = save_dir / "training_history.json"
-                with open(history_path, "w") as f:
-                    json.dump(metrics_history, f, indent=2, cls=NpEncoder)
+                        if torch.cuda.is_available():
+                                torch.cuda.synchronize()
+                        epoch_duration_sec = time.perf_counter() - epoch_start_time
 
-            except Exception as e:
-                    logger.error(f"[ERROR] Pipeline run failed: {e}")
-                    raise e  # Re-raise or handle as needed for sweep tracking
+                        # Calculate throughput (samples / sec)
+                        total_samples = len(train_loader.dataset)
+                        throughput = total_samples / epoch_duration_sec if epoch_duration_sec > 0 else 0.0
 
-            finally:
-                # Executes unconditionally whether the run succeeds or crashes
-                cleanup_pipeline_resources(
-                    patch_model, 
-                    optimizer, 
-                    train_loader, 
-                    val_loader, 
-                    evaluator
-                )
+                        # Capture Peak VRAM usage
+                        peak_vram_gb = (
+                            torch.cuda.max_memory_allocated() / (1024 ** 3) 
+                            if torch.cuda.is_available() else 0.0
+                        )
+
+                        logger.info(
+                            f"Epoch {epoch:02d}/{epochs:02d} | Train Loss: {avg_train_loss:.6f} | "
+                            f"Val AUROC: {val_metrics['AUROC']:.4f} | Val PR-AUC: {current_pr_auc:.4f} | "
+                            f"Val F1_Macro: {val_metrics['F1_Macro']:.4f} | Val F1_Binary: {val_metrics['F1_Binary']:.4f} | "
+                            f"Time: {epoch_duration_sec:.2f}s | Throughput: {throughput:.2f} samples/sec | Peak VRAM: {peak_vram_gb:.2f} GB"
+                        )
+
+                        # 2. Update Early Stopper and Check Best Score
+                        is_early_stop = early_stopper(current_pr_auc)
+
+                        # Checkpoint on best Val PR-AUC
+                        if early_stopper.counter == 0:
+                            save_checkpoint_and_metrics(
+                                    save_dir=save_dir,
+                                    filename="best_model.pt",
+                                    epoch=epoch,
+                                    model=patch_model,
+                                    optimizer=optimizer,
+                                    scheduler=None,  # Pass None if no scheduler
+                                    best_val_pr_auc=early_stopper.best_metric_val,
+                                    train_loss=avg_train_loss,
+                                    val_metrics=val_metrics,
+                                    complexity_info=complexity_info,
+                                    inference_latency_ms=inference_latency_ms,
+                                    epoch_duration_sec=epoch_duration_sec,
+                                    throughput=throughput,
+                                    peak_vram_gb=peak_vram_gb,
+                                    run_identifier=run_identifier,
+                                    mask_name=mask_name,
+                                    logo_mask=logo_mask,
+                            )
+                            logger.info(f"  ⭐️ New best PatchTST PR-AUC saved: {early_stopper.best_metric_val:.4f}")
+
+                        metrics_history.append({
+                            "epoch": epoch,
+                            "model_type": evaluator.model_type,
+                            "feature_mask": mask_name,
+                            "logo_mask": logo_mask or "none",
+                            "run_identifier": run_identifier,
+                            # Core Summary
+                            "train_loss": avg_train_loss,
+                            "val_pr_auc": val_metrics.get("PR-AUC", 0.0),
+                            "val_auroc": val_metrics.get("AUROC", 0.0),
+                            "val_f1_binary": val_metrics.get("F1_Binary", 0.0),
+                            "val_f1_macro": val_metrics.get("F1_Macro", 0.0),
+                            # Operational & Convergence Metrics
+                            "calibrated_tau": val_metrics.get("Calibrated_Tau", 0.0),
+                            "precision": val_metrics.get("Prec", 0.0),
+                            "recall": val_metrics.get("Rec", 0.0),
+                            "fpr": val_metrics.get("FPR", 0.0),
+                            "fnr": val_metrics.get("FNR", 0.0),
+                            # Count Metrics for Convergence Tracking
+                            "tp_count": val_metrics.get("TP", 0),
+                            "fp_count": val_metrics.get("FP", 0),
+                            "tn_count": val_metrics.get("TN", 0),
+                            "fn_count": val_metrics.get("FN", 0),
+                            "total_detected_anomalies": val_metrics.get("TP", 0) + val_metrics.get("FP", 0),
+                            # Computational Metrics
+                            "params_m": complexity_info["params_m"],
+                            "forward_gflops": complexity_info["gflops"],
+                            "inference_latency_ms": inference_latency_ms,
+                            "epoch_duration_sec": epoch_duration_sec,
+                            "throughput_samples_per_sec": throughput,
+                            "peak_vram_gb": peak_vram_gb,
+                        })
+
+                        # 3. Check Early Stopping Condition to Break Loop
+                        if is_early_stop:
+                            logger.info(f"\n✋ Early stopping triggered at Epoch {epoch:02d}. Advancing to next model...")
+                            break
+
+                    # Save structured history alongside best model checkpoint
+                    history_path = save_dir / "training_history.json"
+                    with open(history_path, "w") as f:
+                        json.dump(metrics_history, f, indent=2, cls=NpEncoder)
+
+                except Exception as e:
+                        logger.error(f"[ERROR] Pipeline run failed: {e}")
+                        raise e  # Re-raise or handle as needed for sweep tracking
+
+                finally:
+                    # Executes unconditionally whether the run succeeds or crashes
+                    cleanup_pipeline_resources(
+                        patch_model, 
+                        optimizer, 
+                        train_loader, 
+                        val_loader, 
+                        evaluator
+                    )
 
 def train_ts2vec_epoch(model_net, dataloader, optimizer, scaler, device) -> float:
     """Executes a single TS2Vec hierarchical contrastive training epoch."""
@@ -1515,235 +1585,252 @@ def run_ts2vec_pipeline(exp_config_path: str):
     # -------------------------------------------------------------------------
     feature_masks = exp_cfg.get("feature_masks", ["enabled_baseline"])
     train_logo_masks = exp_cfg.get("logo_masks", {}).get("train_time", None)
+    data_fractions = exp_cfg.get("data_fractions", [1.0]) # Default to full dataset if omitted
 
     # Normalize single string or None into an iterable list
     if not isinstance(train_logo_masks, list):
         train_logo_masks = [train_logo_masks]
+    if not isinstance(data_fractions, list):
+        data_fractions = [data_fractions]
+
 
     for mask_name in feature_masks:
         for logo_mask in train_logo_masks:
-            # Build descriptive directory name: e.g., omni_enabled_baseline_logo_acc
-            logo_tag = f"_logo_{logo_mask}" if logo_mask else ""
-            run_identifier = f"{mask_name}{logo_tag}"
+            for fraction in data_fractions:
+                # Build descriptive directory name: e.g., omni_enabled_baseline_logo_acc
+                logo_tag = f"_logo_{logo_mask}" if logo_mask else ""
+                frac_tag = f"_frac_{int(fraction * 100)}" if fraction < 1.0 else ""
+                run_identifier = f"{mask_name}{logo_tag}{frac_tag}"
 
-            logger.info(
-                f"\n================ MASK: {mask_name} | TRAIN LOGO: {logo_mask or 'NONE'} ================"
-            )
-
-            ts2vec_wrapper = optimizer = train_loader = val_loader = ts2vec_knn_evaluator = None
-
-            try:
-                # 1. Datasets & Loaders
-                train_ds = AviationFourClassDataset(
-                    manifest_dir=env.DATABASE_DIR / "manifests",
-                    database_dir=env.DATABASE_DIR,
-                    stats_path=env.DATABASE_DIR / "metadata" / "train_split_stats.json",
-                    split="train",
-                    feature_set=mask_name,
-                    logo_mask_col=logo_mask,
-                )
-                val_ds = AviationFourClassDataset(
-                    manifest_dir=env.DATABASE_DIR / "manifests",
-                    database_dir=env.DATABASE_DIR,
-                    stats_path=env.DATABASE_DIR / "metadata" / "train_split_stats.json",
-                    split="val",
-                    feature_set=mask_name,
-                    logo_mask_col=logo_mask,
+                logger.info(
+                    f"\n================ MASK: {mask_name} | TRAIN LOGO: {logo_mask or 'NONE'} ================"
                 )
 
-                # 2. Checkpoint Save Directory with LOGO Tag
-                save_dir = checkpoint_base_dir / f"ts2vec_{run_identifier}"
-                save_dir.mkdir(parents=True, exist_ok=True)
-                
-                logger.info(f"Saving checkpoints to: {save_dir}")
-
-                nominal_train_subset = train_ds.get_nominal_subset()
-                train_loader = DataLoader(
-                    nominal_train_subset,
-                    batch_size=exp_cfg["defaults"]["batch_size"],
-                    shuffle=True,
-                    num_workers=exp_cfg["defaults"].get("num_workers", 4),
-                    pin_memory=True,
-                    worker_init_fn=seed_worker,
-                    generator=g,
-                )
-                val_loader = DataLoader(
-                    val_ds,
-                    batch_size=exp_cfg["defaults"]["batch_size"],
-                    shuffle=False,
-                    num_workers=exp_cfg["defaults"].get("num_workers", 4),
-                    pin_memory=True,
-                    worker_init_fn=seed_worker,
-                    generator=g,
-                )
-
-                logger.info(f"🚀 Training TS2Vec on [{mask_name}] (Input Dim: {train_ds.num_channels})")
-
-                # 2. Instantiate TS2Vec Network
-                ts2vec_wrapper = TS2Vec(
-                    input_dims=train_ds.num_channels,
-                    output_dims=model_cfg.get("output_dims", 320),
-                    hidden_dims=model_cfg.get("hidden_dims", 64),
-                    depth=model_cfg.get("depth", 10),
-                    device=device,
-                )
-                
-                # Extract underlying PyTorch network and compile
-                ts2vec_net = ts2vec_wrapper.net
-                if hasattr(torch, "compile"):
-                    ts2vec_net = torch.compile(ts2vec_net)
-                ts2vec_net.to(device)
-
-                optimizer = torch.optim.AdamW(
-                    ts2vec_net.parameters(),
-                    lr=float(exp_cfg["defaults"].get("learning_rate", 1e-4)),
-                    weight_decay=float(exp_cfg["defaults"].get("weight_decay", 1e-5)),
-                )
-                scaler = torch.amp.GradScaler("cuda") if device.type == "cuda" else None
-
-                best_pr_auc = 0.0
-                epochs = model_cfg.get("epochs", exp_cfg["defaults"].get("epochs", 30))
-
-                # =====================================================================
-                # Measure Static Model Complexity (Before Epoch Loop)
-                # =====================================================================
-                # Take a single sample window from train_loader for shape probing
-                sample_batch = next(iter(train_loader))
-                sample_x = sample_batch[0][:1]  # Shape: (1, seq_len, num_features)
-
-                complexity_info = measure_model_complexity(ts2vec_net, sample_x)
-                inference_latency_ms = measure_inference_latency(ts2vec_net, sample_x)
-
-                # Reset peak GPU memory stats before training begins
-                if torch.cuda.is_available():
-                    torch.cuda.reset_peak_memory_stats()
-
-                # Metrics history container
-                metrics_history = []
-
-                for epoch in range(1, epochs + 1):
-                    # Synchronize and start timer for epoch throughput calculation
-                    if torch.cuda.is_available():
-                        torch.cuda.synchronize()
-                    epoch_start_time = time.perf_counter()
-
-                    start_time = time.time()
-                    avg_train_loss = train_ts2vec_epoch(ts2vec_net, train_loader, optimizer, scaler, device)
-                    elapsed = time.time() - start_time
-
-                    # 3. Fit memory bank and evaluate on validation set using AnomalyFourClassEvaluator
-                    ts2vec_knn_evaluator = AnomalyFourClassEvaluator(
-                        model=ts2vec_net,
-                        model_type="ts2vec_knn",
-                        device=device.type,
-                        train_loader=train_loader,  # Extracts & caches nominal memory bank automatically
-                        k=model_cfg.get("k", 5),
-                        normalize_embeddings=model_cfg.get("normalize_embeddings", False),
-                    )
-
-                    val_metrics = ts2vec_knn_evaluator.get_metrics(val_loader, auto_percentile=95.0, compute_gradients=False)
-                    current_pr_auc = val_metrics["PR-AUC"]
-
-                    if torch.cuda.is_available():
-                            torch.cuda.synchronize()
-                    epoch_duration_sec = time.perf_counter() - epoch_start_time
-
-                    # Calculate throughput (samples / sec)
-                    total_samples = len(train_loader.dataset)
-                    throughput = total_samples / epoch_duration_sec if epoch_duration_sec > 0 else 0.0
-
-                    # Capture Peak VRAM usage
-                    peak_vram_gb = (
-                        torch.cuda.max_memory_allocated() / (1024 ** 3) 
-                        if torch.cuda.is_available() else 0.0
-                    )
-
-                    logger.info(
-                        f"Epoch {epoch:02d}/{epochs:02d} | Train Loss: {avg_train_loss:.6f} | "
-                        f"Val AUROC: {val_metrics['AUROC']:.4f} | Val PR-AUC: {current_pr_auc:.4f} | "
-                        f"Val F1_Macro: {val_metrics['F1_Macro']:.4f} | Val F1_Binary: {val_metrics['F1_Binary']:.4f} | "
-                        f"Time: {epoch_duration_sec:.2f}s | Throughput: {throughput:.2f} samples/sec | Peak VRAM: {peak_vram_gb:.2f} GB"
-                    )
-
-                    # Save best checkpoint based on Val PR-AUC
-                    if current_pr_auc > best_pr_auc:
-                        best_pr_auc = current_pr_auc
-
-                        save_checkpoint_and_metrics(
-                                save_dir=save_dir,
-                                filename="best_model.pt",
-                                epoch=epoch,
-                                model=ts2vec_net,
-                                optimizer=optimizer,
-                                scheduler=None,  # Pass None if no scheduler
-                                best_val_pr_auc=best_pr_auc,
-                                train_loss=avg_train_loss,
-                                val_metrics=val_metrics,
-                                complexity_info=complexity_info,
-                                inference_latency_ms=inference_latency_ms,
-                                epoch_duration_sec=epoch_duration_sec,
-                                throughput=throughput,
-                                peak_vram_gb=peak_vram_gb,
-                                run_identifier=run_identifier,
-                                mask_name=mask_name,
-                                logo_mask=logo_mask,
-                        )
-                        logger.info(f"  ⭐️ New best TS2Vec k-NN PR-AUC saved: {best_pr_auc:.4f}")
-
-                    # store metrics history for analysis and visualization
-                    metrics_history.append({
-                        "epoch": epoch,
-                        "model_type": ts2vec_knn_evaluator.model_type,
-                        "feature_mask": mask_name,
-                        "logo_mask": logo_mask or "none",
-                        "run_identifier": run_identifier,
-                        # Core Summary
-                        "train_loss": avg_train_loss,
-                        "val_pr_auc": val_metrics.get("PR-AUC", 0.0),
-                        "val_auroc": val_metrics.get("AUROC", 0.0),
-                        "val_f1_binary": val_metrics.get("F1_Binary", 0.0),
-                        "val_f1_macro": val_metrics.get("F1_Macro", 0.0),
-                        # Operational & Convergence Metrics
-                        "calibrated_tau": val_metrics.get("Calibrated_Tau", 0.0),
-                        "precision": val_metrics.get("Prec", 0.0),
-                        "recall": val_metrics.get("Rec", 0.0),
-                        "fpr": val_metrics.get("FPR", 0.0),
-                        "fnr": val_metrics.get("FNR", 0.0),
-                        # Count Metrics for Convergence Tracking
-                        "tp_count": val_metrics.get("TP", 0),
-                        "fp_count": val_metrics.get("FP", 0),
-                        "tn_count": val_metrics.get("TN", 0),
-                        "fn_count": val_metrics.get("FN", 0),
-                        "total_detected_anomalies": val_metrics.get("TP", 0) + val_metrics.get("FP", 0),
-                        # Computational Metrics
-                        "params_m": complexity_info["params_m"],
-                        "forward_gflops": complexity_info["gflops"],
-                        "inference_latency_ms": inference_latency_ms,
-                        "epoch_duration_sec": epoch_duration_sec,
-                        "throughput_samples_per_sec": throughput,
-                        "peak_vram_gb": peak_vram_gb,
-                    })
-
-                
-                # Save structured history alongside best model checkpoint
-                history_path = save_dir / "training_history.json"
-                with open(history_path, "w") as f:
-                    json.dump(metrics_history, f, indent=2, cls=NpEncoder)
-
-            except Exception as e:
-                logger.error(f"[ERROR] Failed at Mask: {mask_name}, Group: {run_identifier} -> {e}")
-                # Decide whether to raise or continue to the next fold
-                continue
-            finally:
-                # 7. Reclaim GPU/CPU memory BEFORE the next sweep fold starts
-                cleanup_pipeline_resources(
-                    ts2vec_wrapper, 
-                    optimizer, 
-                    train_loader, 
-                    val_loader, 
-                    ts2vec_knn_evaluator
-                )
                 ts2vec_wrapper = optimizer = train_loader = val_loader = ts2vec_knn_evaluator = None
+
+                try:
+                    # 1. Datasets & Loaders
+                    train_ds = AviationFourClassDataset(
+                        manifest_dir=env.DATABASE_DIR / "manifests",
+                        database_dir=env.DATABASE_DIR,
+                        stats_path=env.DATABASE_DIR / "metadata" / "train_split_stats.json",
+                        split="train",
+                        feature_set=mask_name,
+                        logo_mask_col=logo_mask,
+                    )
+                    val_ds = AviationFourClassDataset(
+                        manifest_dir=env.DATABASE_DIR / "manifests",
+                        database_dir=env.DATABASE_DIR,
+                        stats_path=env.DATABASE_DIR / "metadata" / "train_split_stats.json",
+                        split="val",
+                        feature_set=mask_name,
+                        logo_mask_col=logo_mask,
+                    )
+
+                    # 2. Checkpoint Save Directory with LOGO Tag
+                    experiment_tag = exp_cfg.get("experiment_tag", "standard_training")
+                    save_dir = checkpoint_base_dir / experiment_tag / f"ts2vec_{run_identifier}"
+                    save_dir.mkdir(parents=True, exist_ok=True)
+                    
+                    logger.info(f"Saving checkpoints to: {save_dir}")
+
+                    nominal_train_subset = train_ds.get_nominal_subset()
+                    train_loader = DataLoader(
+                        nominal_train_subset,
+                        batch_size=exp_cfg["defaults"]["batch_size"],
+                        shuffle=True,
+                        num_workers=exp_cfg["defaults"].get("num_workers", 4),
+                        pin_memory=True,
+                        worker_init_fn=seed_worker,
+                        generator=g,
+                    )
+                    val_loader = DataLoader(
+                        val_ds,
+                        batch_size=exp_cfg["defaults"]["batch_size"],
+                        shuffle=False,
+                        num_workers=exp_cfg["defaults"].get("num_workers", 4),
+                        pin_memory=True,
+                        worker_init_fn=seed_worker,
+                        generator=g,
+                    )
+
+                    logger.info(f"🚀 Training TS2Vec on [{mask_name}] (Input Dim: {train_ds.num_channels})")
+
+                    # 2. Instantiate TS2Vec Network
+                    ts2vec_wrapper = TS2Vec(
+                        input_dims=train_ds.num_channels,
+                        output_dims=model_cfg.get("output_dims", 320),
+                        hidden_dims=model_cfg.get("hidden_dims", 64),
+                        depth=model_cfg.get("depth", 10),
+                        device=device,
+                    )
+                    
+                    # Extract underlying PyTorch network and compile
+                    ts2vec_net = ts2vec_wrapper.net
+                    if hasattr(torch, "compile"):
+                        ts2vec_net = torch.compile(ts2vec_net)
+                    ts2vec_net.to(device)
+
+                    optimizer = torch.optim.AdamW(
+                        ts2vec_net.parameters(),
+                        lr=float(exp_cfg["defaults"].get("learning_rate", 1e-4)),
+                        weight_decay=float(exp_cfg["defaults"].get("weight_decay", 1e-5)),
+                    )
+                    scaler = torch.amp.GradScaler("cuda") if device.type == "cuda" else None
+
+                    epochs = model_cfg.get("epochs", exp_cfg["defaults"].get("epochs", 100))
+
+                    # =====================================================================
+                    # Measure Static Model Complexity (Before Epoch Loop)
+                    # =====================================================================
+                    # Take a single sample window from train_loader for shape probing
+                    sample_batch = next(iter(train_loader))
+                    sample_x = sample_batch[0][:1]  # Shape: (1, seq_len, num_features)
+
+                    complexity_info = measure_model_complexity(ts2vec_net, sample_x)
+                    inference_latency_ms = measure_inference_latency(ts2vec_net, sample_x)
+
+                    # Reset peak GPU memory stats before training begins
+                    if torch.cuda.is_available():
+                        torch.cuda.reset_peak_memory_stats()
+
+                        # 1. Initialize Early Stopping before epoch loop
+                        patience = exp_cfg.get("defaults", {}).get("patience", 10)
+                        patience_delta = exp_cfg.get("defaults", {}).get("patience_delta", 0.0005)
+                        early_stopper = EarlyStopping(patience=patience, delta=patience_delta, mode="max")
+
+                        epochs = model_cfg.get("epochs", exp_cfg["defaults"].get("epochs", 100))
+                        metrics_history = []
+
+                    for epoch in range(1, epochs + 1):
+                        # Synchronize and start timer for epoch throughput calculation
+                        if torch.cuda.is_available():
+                            torch.cuda.synchronize()
+                        epoch_start_time = time.perf_counter()
+
+                        start_time = time.time()
+                        avg_train_loss = train_ts2vec_epoch(ts2vec_net, train_loader, optimizer, scaler, device)
+                        elapsed = time.time() - start_time
+
+                        # 3. Fit memory bank and evaluate on validation set using AnomalyFourClassEvaluator
+                        ts2vec_knn_evaluator = AnomalyFourClassEvaluator(
+                            model=ts2vec_net,
+                            model_type="ts2vec_knn",
+                            device=device.type,
+                            train_loader=train_loader,  # Extracts & caches nominal memory bank automatically
+                            k=model_cfg.get("k", 5),
+                            normalize_embeddings=model_cfg.get("normalize_embeddings", False),
+                        )
+
+                        val_metrics = ts2vec_knn_evaluator.get_metrics(val_loader, auto_percentile=95.0, compute_gradients=False)
+                        current_pr_auc = val_metrics["PR-AUC"]
+
+                        if torch.cuda.is_available():
+                                torch.cuda.synchronize()
+                        epoch_duration_sec = time.perf_counter() - epoch_start_time
+
+                        # Calculate throughput (samples / sec)
+                        total_samples = len(train_loader.dataset)
+                        throughput = total_samples / epoch_duration_sec if epoch_duration_sec > 0 else 0.0
+
+                        # Capture Peak VRAM usage
+                        peak_vram_gb = (
+                            torch.cuda.max_memory_allocated() / (1024 ** 3) 
+                            if torch.cuda.is_available() else 0.0
+                        )
+
+                        logger.info(
+                            f"Epoch {epoch:02d}/{epochs:02d} | Train Loss: {avg_train_loss:.6f} | "
+                            f"Val AUROC: {val_metrics['AUROC']:.4f} | Val PR-AUC: {current_pr_auc:.4f} | "
+                            f"Val F1_Macro: {val_metrics['F1_Macro']:.4f} | Val F1_Binary: {val_metrics['F1_Binary']:.4f} | "
+                            f"Time: {epoch_duration_sec:.2f}s | Throughput: {throughput:.2f} samples/sec | Peak VRAM: {peak_vram_gb:.2f} GB"
+                        )
+
+                        # 2. Update Early Stopper and Check Best Score
+                        is_early_stop = early_stopper(current_pr_auc)
+
+                        # Save best checkpoint based on Val PR-AUC
+                        if early_stopper.counter == 0:
+
+                            save_checkpoint_and_metrics(
+                                    save_dir=save_dir,
+                                    filename="best_model.pt",
+                                    epoch=epoch,
+                                    model=ts2vec_net,
+                                    optimizer=optimizer,
+                                    scheduler=None,  # Pass None if no scheduler
+                                    best_val_pr_auc=early_stopper.best_metric_val,
+                                    train_loss=avg_train_loss,
+                                    val_metrics=val_metrics,
+                                    complexity_info=complexity_info,
+                                    inference_latency_ms=inference_latency_ms,
+                                    epoch_duration_sec=epoch_duration_sec,
+                                    throughput=throughput,
+                                    peak_vram_gb=peak_vram_gb,
+                                    run_identifier=run_identifier,
+                                    mask_name=mask_name,
+                                    logo_mask=logo_mask,
+                            )
+                            logger.info(f"  ⭐️ New best TS2Vec k-NN PR-AUC saved: {early_stopper.best_metric_val:.4f}")
+
+                        # store metrics history for analysis and visualization
+                        metrics_history.append({
+                            "epoch": epoch,
+                            "model_type": ts2vec_knn_evaluator.model_type,
+                            "feature_mask": mask_name,
+                            "logo_mask": logo_mask or "none",
+                            "run_identifier": run_identifier,
+                            # Core Summary
+                            "train_loss": avg_train_loss,
+                            "val_pr_auc": val_metrics.get("PR-AUC", 0.0),
+                            "val_auroc": val_metrics.get("AUROC", 0.0),
+                            "val_f1_binary": val_metrics.get("F1_Binary", 0.0),
+                            "val_f1_macro": val_metrics.get("F1_Macro", 0.0),
+                            # Operational & Convergence Metrics
+                            "calibrated_tau": val_metrics.get("Calibrated_Tau", 0.0),
+                            "precision": val_metrics.get("Prec", 0.0),
+                            "recall": val_metrics.get("Rec", 0.0),
+                            "fpr": val_metrics.get("FPR", 0.0),
+                            "fnr": val_metrics.get("FNR", 0.0),
+                            # Count Metrics for Convergence Tracking
+                            "tp_count": val_metrics.get("TP", 0),
+                            "fp_count": val_metrics.get("FP", 0),
+                            "tn_count": val_metrics.get("TN", 0),
+                            "fn_count": val_metrics.get("FN", 0),
+                            "total_detected_anomalies": val_metrics.get("TP", 0) + val_metrics.get("FP", 0),
+                            # Computational Metrics
+                            "params_m": complexity_info["params_m"],
+                            "forward_gflops": complexity_info["gflops"],
+                            "inference_latency_ms": inference_latency_ms,
+                            "epoch_duration_sec": epoch_duration_sec,
+                            "throughput_samples_per_sec": throughput,
+                            "peak_vram_gb": peak_vram_gb,
+                        })
+
+                        # 3. Check Early Stopping Condition to Break Loop
+                        if is_early_stop:
+                            logger.info(f"\n✋ Early stopping triggered at Epoch {epoch:02d}. Advancing to next model...")
+                            break
+            
+                    # Save structured history alongside best model checkpoint
+                    history_path = save_dir / "training_history.json"
+                    with open(history_path, "w") as f:
+                        json.dump(metrics_history, f, indent=2, cls=NpEncoder)
+
+                except Exception as e:
+                    logger.error(f"[ERROR] Failed at Mask: {mask_name}, Group: {run_identifier} -> {e}")
+                    # Decide whether to raise or continue to the next fold
+                    continue
+                finally:
+                    # 7. Reclaim GPU/CPU memory BEFORE the next sweep fold starts
+                    cleanup_pipeline_resources(
+                        ts2vec_wrapper, 
+                        optimizer, 
+                        train_loader, 
+                        val_loader, 
+                        ts2vec_knn_evaluator
+                    )
+                    ts2vec_wrapper = optimizer = train_loader = val_loader = ts2vec_knn_evaluator = None
 
 def build_omni_model(input_dim: int, seq_len: int, model_cfg: dict) -> nn.Module:
     """Instantiates OmniAnomaly matching notebook parameters."""
@@ -1815,230 +1902,236 @@ def run_omni_pipeline(exp_config_path: str):
     # -------------------------------------------------------------------------
     feature_masks = exp_cfg.get("feature_masks", ["enabled_baseline"])
     train_logo_masks = exp_cfg.get("logo_masks", {}).get("train_time", None)
+    data_fractions = exp_cfg.get("data_fractions", [1.0]) # Default to full dataset if omitted
 
     # Normalize single string or None into an iterable list
     if not isinstance(train_logo_masks, list):
         train_logo_masks = [train_logo_masks]
+    if not isinstance(data_fractions, list):
+        data_fractions = [data_fractions]
 
     for mask_name in feature_masks:
         for logo_mask in train_logo_masks:
-            # Build descriptive directory name: e.g., omni_enabled_baseline_logo_acc
-            logo_tag = f"_logo_{logo_mask}" if logo_mask else ""
-            run_identifier = f"{mask_name}{logo_tag}"
+            for fraction in data_fractions:
+                # Build descriptive directory name: e.g., omni_enabled_baseline_logo_acc
+                logo_tag = f"_logo_{logo_mask}" if logo_mask else ""
+                frac_tag = f"_frac_{int(fraction * 100)}" if fraction < 1.0 else ""
+                run_identifier = f"{mask_name}{logo_tag}{frac_tag}"
 
-            logger.info(
-                f"\n================ MASK: {mask_name} | TRAIN LOGO: {logo_mask or 'NONE'} ================"
-            )
-
-            model = optimizer = train_loader = val_loader = evaluator = None
-
-            try:
-                # 1. Datasets & Loaders
-                train_ds = AviationFourClassDataset(
-                    manifest_dir=env.DATABASE_DIR / "manifests",
-                    database_dir=env.DATABASE_DIR,
-                    stats_path=env.DATABASE_DIR / "metadata" / "train_split_stats.json",
-                    split="train",
-                    feature_set=mask_name,
-                    logo_mask_col=logo_mask,
-                )
-                val_ds = AviationFourClassDataset(
-                    manifest_dir=env.DATABASE_DIR / "manifests",
-                    database_dir=env.DATABASE_DIR,
-                    stats_path=env.DATABASE_DIR / "metadata" / "train_split_stats.json",
-                    split="val",
-                    feature_set=mask_name,
-                    logo_mask_col=logo_mask,
+                logger.info(
+                    f"\n================ MASK: {mask_name} | TRAIN LOGO: {logo_mask or 'NONE'} | DATA FRAC: {fraction} ================"
                 )
 
-                nominal_train_subset = train_ds.get_nominal_subset()
-                train_loader = DataLoader(
-                    nominal_train_subset,
-                    batch_size=exp_cfg["defaults"]["batch_size"],
-                    shuffle=True,
-                    num_workers=exp_cfg["defaults"].get("num_workers", 4),
-                    pin_memory=True,
-                    worker_init_fn=seed_worker,
-                    generator=g,
-                )
-                val_loader = DataLoader(
-                    val_ds,
-                    batch_size=exp_cfg["defaults"]["batch_size"],
-                    shuffle=False,
-                    num_workers=exp_cfg["defaults"].get("num_workers", 4),
-                    pin_memory=True,
-                    worker_init_fn=seed_worker,
-                    generator=g,
-                )
-
-                # 2. Extract OmniAnomaly Configuration
-                model_cfg = exp_cfg["models"]["omni"]
-                logger.info(f"\n🚀 Training OmniAnomaly on [{mask_name}] (Input Dim: {train_ds.num_channels})")
-
-                model = build_omni_model(
-                    input_dim=train_ds.num_channels,
-                    seq_len=train_ds.window_size,
-                    model_cfg=model_cfg,
-                ).to(device)
-
-                optimizer = torch.optim.AdamW(
-                    model.parameters(),
-                    lr=float(exp_cfg["defaults"].get("learning_rate", 1e-4)),
-                    weight_decay=float(exp_cfg["defaults"].get("weight_decay", 1e-5)),
-                )
-                scaler = torch.amp.GradScaler("cuda") if device.type == "cuda" else None
-
-                # Instantiate AnomalyFourClassEvaluator for validation tracking
-                evaluator = AnomalyFourClassEvaluator(model, model_type="omni", device=device.type)
-
-                # 2. Checkpoint Save Directory with LOGO Tag
-                save_dir = checkpoint_base_dir / f"{evaluator.model_type}_{run_identifier}"
-                save_dir.mkdir(parents=True, exist_ok=True)
-                
-                logger.info(f"Saving checkpoints to: {save_dir}")
-
-                best_pr_auc = 0.0
-                epochs = model_cfg.get("epochs", exp_cfg["defaults"].get("epochs", 30))
-                # Initialize Early Stopping before epoch loop (e.g., patience=8 for PR-AUC)
-                patience = exp_cfg.get("defaults", {}).get("patience", 10)
-                patience_delta = exp_cfg.get("defaults", {}).get("patience_delta", 0.0005)
-                early_stopper = EarlyStopping(patience=patience, delta=patience_delta, mode="max")
-
-                # =====================================================================
-                # Measure Static Model Complexity (Before Epoch Loop)
-                # =====================================================================
-                # Take a single sample window from train_loader for shape probing
-                sample_batch = next(iter(train_loader))
-                sample_x = sample_batch[0][:1]  # Shape: (1, seq_len, num_features)
-
-                complexity_info = measure_model_complexity(model, sample_x)
-                inference_latency_ms = measure_inference_latency(model, sample_x)
-
-                # Reset peak GPU memory stats before training begins
-                if torch.cuda.is_available():
-                    torch.cuda.reset_peak_memory_stats()
-
-                # Metrics history container
-                metrics_history = []
-
-                for epoch in range(1, epochs + 1):
-                    # Synchronize and start timer for epoch throughput calculation
-                    if torch.cuda.is_available():
-                        torch.cuda.synchronize()
-                    epoch_start_time = time.perf_counter()
-
-                    start_time = time.time()
-                    avg_train_loss = train_omni_epoch(model, train_loader, optimizer, scaler, device)
-                    elapsed = time.time() - start_time
-
-                    # Compute Validation Metrics using AnomalyFourClassEvaluator
-                    val_metrics = evaluator.get_metrics(val_loader, compute_gradients=False)
-                    current_pr_auc = val_metrics["PR-AUC"]
-
-                    if torch.cuda.is_available():
-                            torch.cuda.synchronize()
-                    epoch_duration_sec = time.perf_counter() - epoch_start_time
-
-                    # Calculate throughput (samples / sec)
-                    total_samples = len(train_loader.dataset)
-                    throughput = total_samples / epoch_duration_sec if epoch_duration_sec > 0 else 0.0
-
-                    # Capture Peak VRAM usage
-                    peak_vram_gb = (
-                        torch.cuda.max_memory_allocated() / (1024 ** 3) 
-                        if torch.cuda.is_available() else 0.0
-                    )
-
-                    logger.info(
-                        f"Epoch {epoch:02d}/{epochs:02d} | Train Loss: {avg_train_loss:.6f} | "
-                        f"Val AUROC: {val_metrics['AUROC']:.4f} | Val PR-AUC: {current_pr_auc:.4f} | "
-                        f"Val F1_Macro: {val_metrics['F1_Macro']:.4f} | Val F1_Binary: {val_metrics['F1_Binary']:.4f} | "
-                        f"Time: {epoch_duration_sec:.2f}s | Throughput: {throughput:.2f} samples/sec | Peak VRAM: {peak_vram_gb:.2f} GB"
-                    )
-
-                    # Save best checkpoint based on Val PR-AUC
-                    is_early_stop = early_stopper(current_pr_auc)  # update current Val PR-AUC
-                    if early_stopper.counter == 0:   # best score
-
-                        save_checkpoint_and_metrics(
-                                save_dir=save_dir,
-                                filename="best_model.pt",
-                                epoch=epoch,
-                                model=model,
-                                optimizer=optimizer,
-                                scheduler=None,  # Pass None if no scheduler
-                                best_val_pr_auc=early_stopper.best_metric_val,
-                                train_loss=avg_train_loss,
-                                val_metrics=val_metrics,
-                                complexity_info=complexity_info,
-                                inference_latency_ms=inference_latency_ms,
-                                epoch_duration_sec=epoch_duration_sec,
-                                throughput=throughput,
-                                peak_vram_gb=peak_vram_gb,
-                                run_identifier=run_identifier,
-                                mask_name=mask_name,
-                                logo_mask=logo_mask,
-                        )
-                        logger.info(f"  ⭐️ New best PR-AUC saved: {early_stopper.best_metric_val:.4f}")
-
-                    metrics_history.append({
-                        "epoch": epoch,
-                        "model_type": evaluator.model_type,
-                        "feature_mask": mask_name,
-                        "logo_mask": logo_mask or "none",
-                        "run_identifier": run_identifier,
-                        # Core Summary
-                        "train_loss": avg_train_loss,
-                        "val_pr_auc": val_metrics.get("PR-AUC", 0.0),
-                        "val_auroc": val_metrics.get("AUROC", 0.0),
-                        "val_f1_binary": val_metrics.get("F1_Binary", 0.0),
-                        "val_f1_macro": val_metrics.get("F1_Macro", 0.0),
-                        # Operational & Convergence Metrics
-                        "calibrated_tau": val_metrics.get("Calibrated_Tau", 0.0),
-                        "precision": val_metrics.get("Prec", 0.0),
-                        "recall": val_metrics.get("Rec", 0.0),
-                        "fpr": val_metrics.get("FPR", 0.0),
-                        "fnr": val_metrics.get("FNR", 0.0),
-                        # Count Metrics for Convergence Tracking
-                        "tp_count": val_metrics.get("TP", 0),
-                        "fp_count": val_metrics.get("FP", 0),
-                        "tn_count": val_metrics.get("TN", 0),
-                        "fn_count": val_metrics.get("FN", 0),
-                        "total_detected_anomalies": val_metrics.get("TP", 0) + val_metrics.get("FP", 0),
-                        # Computational Metrics
-                        "params_m": complexity_info["params_m"],
-                        "forward_gflops": complexity_info["gflops"],
-                        "inference_latency_ms": inference_latency_ms,
-                        "epoch_duration_sec": epoch_duration_sec,
-                        "throughput_samples_per_sec": throughput,
-                        "peak_vram_gb": peak_vram_gb,
-                    })
-
-                    # Check early stopping condition
-                    if is_early_stop:
-                        logger.info(f"\n✋ Early stopping triggered at Epoch {epoch:02d}. Advancing to next model...")
-                        break
-
-                # Save structured history alongside best model checkpoint
-                history_path = save_dir / "training_history.json"
-                with open(history_path, "w") as f:
-                    json.dump(metrics_history, f, indent=2, cls=NpEncoder)
-
-            except Exception as e:
-                logger.error(f"[ERROR] Failed at Mask: {mask_name}, Group: {run_identifier} -> {e}")
-                # Decide whether to raise or continue to the next fold
-                continue
-
-            finally:
-                # 7. Reclaim GPU/CPU memory BEFORE the next sweep fold starts
-                cleanup_pipeline_resources(
-                    model, 
-                    optimizer, 
-                    train_loader, 
-                    val_loader, 
-                    evaluator
-                )
                 model = optimizer = train_loader = val_loader = evaluator = None
+
+                try:
+                    # 1. Datasets & Loaders
+                    train_ds = AviationFourClassDataset(
+                        manifest_dir=env.DATABASE_DIR / "manifests",
+                        database_dir=env.DATABASE_DIR,
+                        stats_path=env.DATABASE_DIR / "metadata" / "train_split_stats.json",
+                        split="train",
+                        feature_set=mask_name,
+                        logo_mask_col=logo_mask,
+                    )
+                    val_ds = AviationFourClassDataset(
+                        manifest_dir=env.DATABASE_DIR / "manifests",
+                        database_dir=env.DATABASE_DIR,
+                        stats_path=env.DATABASE_DIR / "metadata" / "train_split_stats.json",
+                        split="val",
+                        feature_set=mask_name,
+                        logo_mask_col=logo_mask,
+                    )
+
+                    nominal_train_subset = train_ds.get_nominal_subset(fraction=fraction, seed=seed)
+                    train_loader = DataLoader(
+                        nominal_train_subset,
+                        batch_size=exp_cfg["defaults"]["batch_size"],
+                        shuffle=True,
+                        num_workers=exp_cfg["defaults"].get("num_workers", 4),
+                        pin_memory=True,
+                        worker_init_fn=seed_worker,
+                        generator=g,
+                    )
+                    val_loader = DataLoader(
+                        val_ds,
+                        batch_size=exp_cfg["defaults"]["batch_size"],
+                        shuffle=False,
+                        num_workers=exp_cfg["defaults"].get("num_workers", 4),
+                        pin_memory=True,
+                        worker_init_fn=seed_worker,
+                        generator=g,
+                    )
+
+                    # 2. Extract OmniAnomaly Configuration
+                    model_cfg = exp_cfg["models"]["omni"]
+                    logger.info(f"\n🚀 Training OmniAnomaly on [{mask_name}] (Input Dim: {train_ds.num_channels})")
+
+                    model = build_omni_model(
+                        input_dim=train_ds.num_channels,
+                        seq_len=train_ds.window_size,
+                        model_cfg=model_cfg,
+                    ).to(device)
+
+                    optimizer = torch.optim.AdamW(
+                        model.parameters(),
+                        lr=float(exp_cfg["defaults"].get("learning_rate", 1e-4)),
+                        weight_decay=float(exp_cfg["defaults"].get("weight_decay", 1e-5)),
+                    )
+                    scaler = torch.amp.GradScaler("cuda") if device.type == "cuda" else None
+
+                    # Instantiate AnomalyFourClassEvaluator for validation tracking
+                    evaluator = AnomalyFourClassEvaluator(model, model_type="omni", device=device.type)
+
+                    # 2. Checkpoint Save Directory with LOGO Tag
+                    experiment_tag = exp_cfg.get("experiment_tag", "standard_training")
+                    save_dir = checkpoint_base_dir / experiment_tag / f"{evaluator.model_type}_{run_identifier}"
+                    save_dir.mkdir(parents=True, exist_ok=True)
+                    
+                    logger.info(f"Saving checkpoints to: {save_dir}")
+
+                    best_pr_auc = 0.0
+                    epochs = model_cfg.get("epochs", exp_cfg["defaults"].get("epochs", 100))
+                    # Initialize Early Stopping before epoch loop (e.g., patience=8 for PR-AUC)
+                    patience = exp_cfg.get("defaults", {}).get("patience", 10)
+                    patience_delta = exp_cfg.get("defaults", {}).get("patience_delta", 0.0005)
+                    early_stopper = EarlyStopping(patience=patience, delta=patience_delta, mode="max")
+
+                    # =====================================================================
+                    # Measure Static Model Complexity (Before Epoch Loop)
+                    # =====================================================================
+                    # Take a single sample window from train_loader for shape probing
+                    sample_batch = next(iter(train_loader))
+                    sample_x = sample_batch[0][:1]  # Shape: (1, seq_len, num_features)
+
+                    complexity_info = measure_model_complexity(model, sample_x)
+                    inference_latency_ms = measure_inference_latency(model, sample_x)
+
+                    # Reset peak GPU memory stats before training begins
+                    if torch.cuda.is_available():
+                        torch.cuda.reset_peak_memory_stats()
+
+                    # Metrics history container
+                    metrics_history = []
+
+                    for epoch in range(1, epochs + 1):
+                        # Synchronize and start timer for epoch throughput calculation
+                        if torch.cuda.is_available():
+                            torch.cuda.synchronize()
+                        epoch_start_time = time.perf_counter()
+
+                        start_time = time.time()
+                        avg_train_loss = train_omni_epoch(model, train_loader, optimizer, scaler, device)
+                        elapsed = time.time() - start_time
+
+                        # Compute Validation Metrics using AnomalyFourClassEvaluator
+                        val_metrics = evaluator.get_metrics(val_loader, compute_gradients=False)
+                        current_pr_auc = val_metrics["PR-AUC"]
+
+                        if torch.cuda.is_available():
+                                torch.cuda.synchronize()
+                        epoch_duration_sec = time.perf_counter() - epoch_start_time
+
+                        # Calculate throughput (samples / sec)
+                        total_samples = len(train_loader.dataset)
+                        throughput = total_samples / epoch_duration_sec if epoch_duration_sec > 0 else 0.0
+
+                        # Capture Peak VRAM usage
+                        peak_vram_gb = (
+                            torch.cuda.max_memory_allocated() / (1024 ** 3) 
+                            if torch.cuda.is_available() else 0.0
+                        )
+
+                        logger.info(
+                            f"Epoch {epoch:02d}/{epochs:02d} | Train Loss: {avg_train_loss:.6f} | "
+                            f"Val AUROC: {val_metrics['AUROC']:.4f} | Val PR-AUC: {current_pr_auc:.4f} | "
+                            f"Val F1_Macro: {val_metrics['F1_Macro']:.4f} | Val F1_Binary: {val_metrics['F1_Binary']:.4f} | "
+                            f"Time: {epoch_duration_sec:.2f}s | Throughput: {throughput:.2f} samples/sec | Peak VRAM: {peak_vram_gb:.2f} GB"
+                        )
+
+                        # Save best checkpoint based on Val PR-AUC
+                        is_early_stop = early_stopper(current_pr_auc)  # update current Val PR-AUC
+                        if early_stopper.counter == 0:   # best score
+
+                            save_checkpoint_and_metrics(
+                                    save_dir=save_dir,
+                                    filename="best_model.pt",
+                                    epoch=epoch,
+                                    model=model,
+                                    optimizer=optimizer,
+                                    scheduler=None,  # Pass None if no scheduler
+                                    best_val_pr_auc=early_stopper.best_metric_val,
+                                    train_loss=avg_train_loss,
+                                    val_metrics=val_metrics,
+                                    complexity_info=complexity_info,
+                                    inference_latency_ms=inference_latency_ms,
+                                    epoch_duration_sec=epoch_duration_sec,
+                                    throughput=throughput,
+                                    peak_vram_gb=peak_vram_gb,
+                                    run_identifier=run_identifier,
+                                    mask_name=mask_name,
+                                    logo_mask=logo_mask,
+                            )
+                            logger.info(f"  ⭐️ New best PR-AUC saved: {early_stopper.best_metric_val:.4f}")
+
+                        metrics_history.append({
+                            "epoch": epoch,
+                            "model_type": evaluator.model_type,
+                            "feature_mask": mask_name,
+                            "logo_mask": logo_mask or "none",
+                            "run_identifier": run_identifier,
+                            # Core Summary
+                            "train_loss": avg_train_loss,
+                            "val_pr_auc": val_metrics.get("PR-AUC", 0.0),
+                            "val_auroc": val_metrics.get("AUROC", 0.0),
+                            "val_f1_binary": val_metrics.get("F1_Binary", 0.0),
+                            "val_f1_macro": val_metrics.get("F1_Macro", 0.0),
+                            # Operational & Convergence Metrics
+                            "calibrated_tau": val_metrics.get("Calibrated_Tau", 0.0),
+                            "precision": val_metrics.get("Prec", 0.0),
+                            "recall": val_metrics.get("Rec", 0.0),
+                            "fpr": val_metrics.get("FPR", 0.0),
+                            "fnr": val_metrics.get("FNR", 0.0),
+                            # Count Metrics for Convergence Tracking
+                            "tp_count": val_metrics.get("TP", 0),
+                            "fp_count": val_metrics.get("FP", 0),
+                            "tn_count": val_metrics.get("TN", 0),
+                            "fn_count": val_metrics.get("FN", 0),
+                            "total_detected_anomalies": val_metrics.get("TP", 0) + val_metrics.get("FP", 0),
+                            # Computational Metrics
+                            "params_m": complexity_info["params_m"],
+                            "forward_gflops": complexity_info["gflops"],
+                            "inference_latency_ms": inference_latency_ms,
+                            "epoch_duration_sec": epoch_duration_sec,
+                            "throughput_samples_per_sec": throughput,
+                            "peak_vram_gb": peak_vram_gb,
+                        })
+
+                        # Check early stopping condition
+                        if is_early_stop:
+                            logger.info(f"\n✋ Early stopping triggered at Epoch {epoch:02d}. Advancing to next model...")
+                            break
+
+                    # Save structured history alongside best model checkpoint
+                    history_path = save_dir / "training_history.json"
+                    with open(history_path, "w") as f:
+                        json.dump(metrics_history, f, indent=2, cls=NpEncoder)
+
+                except Exception as e:
+                    logger.error(f"[ERROR] Failed at Mask: {mask_name}, Group: {run_identifier} -> {e}")
+                    # Decide whether to raise or continue to the next fold
+                    continue
+
+                finally:
+                    # 7. Reclaim GPU/CPU memory BEFORE the next sweep fold starts
+                    cleanup_pipeline_resources(
+                        model, 
+                        optimizer, 
+                        train_loader, 
+                        val_loader, 
+                        evaluator
+                    )
+                    model = optimizer = train_loader = val_loader = evaluator = None
 
 
 def main():
@@ -2067,7 +2160,7 @@ def main():
     parser.add_argument(
         "--config",
         type=str,
-        default="configs/experiments.yaml",
+        default="configs/experiments_features.yaml",
         help="Path to experiment configuration YAML file",
     )
 

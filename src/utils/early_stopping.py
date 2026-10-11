@@ -14,7 +14,8 @@ class EarlyStopping:
         patience: int = 7, 
         delta: float = 1e-4, 
         mode: str = "max",
-        verbose: bool = True
+        verbose: bool = True,
+        min_epochs: int = 10
     ):
         """
         Args:
@@ -27,10 +28,12 @@ class EarlyStopping:
         self.delta = delta
         self.mode = mode
         self.verbose = verbose
+        self.min_epochs = min_epochs
         
         self.counter = 0
         self.best_score = None
         self.early_stop = False
+        self.current_epoch = 0
 
     @property
     def best_metric_val(self) -> float:
@@ -39,19 +42,32 @@ class EarlyStopping:
             return 0.0 if self.mode == "max" else float("inf")
         return self.best_score if self.mode == "max" else -self.best_score
 
-    def __call__(self, val_metric: float) -> bool:
+    def __call__(self, val_metric: float, epoch: int = None) -> bool:
+        if epoch is not None:
+            self.current_epoch = epoch
+        else:
+            self.current_epoch += 1
+
         score = val_metric if self.mode == "max" else -val_metric
 
         if self.best_score is None:
             self.best_score = score
-        elif score < self.best_score + self.delta:
-            self.counter += 1
-            if self.verbose:
-                logger.info(f"  ⏳ EarlyStopping counter: {self.counter} out of {self.patience}")
-            if self.counter >= self.patience:
-                self.early_stop = True
-        else:
+            return self.early_stop
+
+        # Check if score improved significantly
+        if score > self.best_score + self.delta:
             self.best_score = score
-            self.counter = 0
+            self.counter = 0  # Reset patience on genuine improvement
+        else:
+            # Only increment patience counter if we are past the min_epochs warmup
+            if self.current_epoch >= self.min_epochs:
+                self.counter += 1
+                if self.verbose:
+                    logger.info(f"  ⏳ EarlyStopping counter: {self.counter} out of {self.patience}")
+                if self.counter >= self.patience:
+                    self.early_stop = True
+            else:
+                if self.verbose:
+                    logger.info(f"  🛡️ Warmup phase ({self.current_epoch}/{self.min_epochs}): Suppressing early stop.")
 
         return self.early_stop

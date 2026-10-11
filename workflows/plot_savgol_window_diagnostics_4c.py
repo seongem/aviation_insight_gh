@@ -169,6 +169,7 @@ def generate_sweep_report_and_heatmaps(
     results_df = (
         pd.DataFrame(records)
         .sort_values(by=["N_state", "N_body"])
+        .drop_duplicates(subset=["N_state", "N_body"], keep="last")  # <--- Deduplicate here
         .reset_index(drop=True)
     )
 
@@ -389,11 +390,11 @@ if __name__ == "__main__":
     parquet_candidates = sorted(
         list(database_dir.glob("four_class_derived_dataset_savgol_*.parquet"))
     )
-    target_parquet = (
-        parquet_candidates[-1]
-        if parquet_candidates
-        else (database_dir / "four_class_derived_dataset.parquet")
-    )
+
+    # always use symlink
+    target_parquet = database_dir / "four_class_derived_dataset.parquet"
+    if not target_parquet.exists():
+        raise FileNotFoundError(f"Active dataset symlink not found at {target_parquet}")
 
     out_plot = (
         reports_figures_dir

@@ -1,197 +1,204 @@
 feature_idx,feature_name,group_id,group_name,units,source_stage,enabled_baseline,enabled_acc,enabled_piml,enabled_all,logo_drop_g1_dynamics,logo_drop_g2_kinematics,logo_drop_g3_configuration,logo_drop_g4_propulsion,logo_drop_g5_guidance,logo_drop_g6_system___metadata,logo_drop_g7_accelerations___rates,logo_drop_g8_physics_residuals
-0,var_1107,6,System / Metadata,<units>,etl_staged,False,False,False,False,False,False,False,False,False,False,False,False
-1,var_2670,6,System / Metadata,<units>,etl_staged,False,False,False,False,False,False,False,False,False,False,False,False
-2,var_5107,6,System / Metadata,<units>,etl_staged,False,False,False,False,False,False,False,False,False,False,False,False
-3,var_6670,6,System / Metadata,<units>,etl_staged,False,False,False,False,False,False,False,False,False,False,False,False
-4,fpac,1,Dynamics,G,etl_staged,False,True,False,True,False,True,True,True,True,True,True,True
-5,blac,1,Dynamics,G,etl_staged,False,True,False,True,False,True,True,True,True,True,True,True
-6,ctac,1,Dynamics,G,etl_staged,False,True,False,True,False,True,True,True,True,True,True,True
-7,th,2,Kinematics,DEG,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
-8,mh,2,Kinematics,DEG,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
-9,egt_1,4,Propulsion,DEG,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
-10,egt_2,4,Propulsion,DEG,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
-11,egt_3,4,Propulsion,DEG,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
-12,egt_4,4,Propulsion,DEG,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
-13,ivv,2,Kinematics,FT/MIN,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
-14,gs,1,Dynamics,KNOTS,etl_staged,True,True,True,True,False,True,True,True,True,True,True,True
-15,trk,2,Kinematics,DEG,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
-16,trkm,2,Kinematics,DEG,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
-17,da,2,Kinematics,DEG,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
-18,povt,4,Propulsion,,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
-19,ws,2,Kinematics,KNOTS,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
-20,mw,3,Configuration,,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
-21,dfgs,5,Guidance,,etl_staged,True,True,True,True,True,True,True,True,False,True,True,True
-22,wd,2,Kinematics,DEG,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
-23,alt,2,Kinematics,FEET,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
-24,nsqt,3,Configuration,,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
-25,ralt,2,Kinematics,FEET,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
-26,altr,2,Kinematics,FT/MIN,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
-27,fqty_1,4,Propulsion,LBS,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
-28,oit_1,4,Propulsion,DEG,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
-29,oit_2,4,Propulsion,DEG,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
-30,aoa1,2,Kinematics,DEG,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
-31,aoa2,2,Kinematics,DEG,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
-32,ptch,2,Kinematics,DEG,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
-33,ff_1,4,Propulsion,LBS/HR,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
-34,psa,2,Kinematics,MB,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
-35,ff_2,4,Propulsion,LBS/HR,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
-36,ff_3,4,Propulsion,LBS/HR,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
-37,roll,2,Kinematics,DEG,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
-38,ff_4,4,Propulsion,LBS/HR,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
-39,n1_1,4,Propulsion,%RPM,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
-40,n1_2,4,Propulsion,%RPM,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
-41,mach,2,Kinematics,MACH,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
-42,cas,2,Kinematics,KNOTS,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
-43,apfd,5,Guidance,,etl_staged,True,True,True,True,True,True,True,True,False,True,True,True
-44,ph,6,System / Metadata,,etl_staged,True,True,True,True,True,True,True,True,True,False,True,True
-45,casm,2,Kinematics,KNOTS,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
-46,tas,2,Kinematics,KNOTS,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
-47,vrtg,1,Dynamics,G,etl_staged,False,True,False,True,False,True,True,True,True,True,True,True
-48,latg,1,Dynamics,G,etl_staged,False,True,False,True,False,True,True,True,True,True,True,True
-49,pi,2,Kinematics,MB,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
-50,ps,2,Kinematics,IN,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
-51,n1_3,4,Propulsion,%RPM,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
-52,evnt,6,System / Metadata,,etl_staged,True,True,True,True,True,True,True,True,True,False,True,True
-53,mrk,5,Guidance,,etl_staged,True,True,True,True,True,True,True,True,False,True,True,True
-54,vib_1,4,Propulsion,IN/SEC,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
-55,pt,2,Kinematics,MB,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
-56,vhf1,5,Guidance,,etl_staged,True,True,True,True,True,True,True,True,False,True,True,True
-57,vhf2,5,Guidance,,etl_staged,True,True,True,True,True,True,True,True,False,True,True,True
-58,lgdn,3,Configuration,,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
-59,lgup,3,Configuration,,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
-60,vib_2,4,Propulsion,IN/SEC,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
-61,vhf3,5,Guidance,,etl_staged,True,True,True,True,True,True,True,True,False,True,True,True
-62,push,3,Configuration,,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
-63,shkr,3,Configuration,,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
-64,msqt_2,3,Configuration,,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
-65,vib_3,4,Propulsion,IN/SEC,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
-66,long,1,Dynamics,G,etl_staged,False,True,False,True,False,True,True,True,True,True,True,True
-67,pla_1,3,Configuration,DEG,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
-68,n1_4,4,Propulsion,%RPM,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
-69,hydy,3,Configuration,,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
-70,hydg,3,Configuration,,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
-71,smok,3,Configuration,,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
-72,calt,2,Kinematics,,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
-73,vib_4,4,Propulsion,IN/SEC,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
-74,pla_2,3,Configuration,DEG,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
-75,pla_3,3,Configuration,DEG,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
-76,pla_4,3,Configuration,DEG,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
-77,gmt_hour,6,System / Metadata,Hour,etl_staged,False,False,False,False,False,False,False,False,False,False,False,False
-78,gmt_minute,6,System / Metadata,Minute,etl_staged,False,False,False,False,False,False,False,False,False,False,False,False
-79,gmt_sec,6,System / Metadata,Second,etl_staged,False,False,False,False,False,False,False,False,False,False,False,False
-80,acmt,6,System / Metadata,,etl_staged,True,True,True,True,True,True,True,True,True,False,True,True
-81,fqty_2,4,Propulsion,LSB,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
-82,oit_3,4,Propulsion,DEG,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
-83,oit_4,4,Propulsion,DEG,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
-84,date_year,6,System / Metadata,Year,etl_staged,False,False,False,False,False,False,False,False,False,False,False,False
-85,date_month,6,System / Metadata,Month,etl_staged,False,False,False,False,False,False,False,False,False,False,False,False
-86,date_day,6,System / Metadata,Day,etl_staged,False,False,False,False,False,False,False,False,False,False,False,False
-87,dver_1,6,System / Metadata,,etl_staged,False,False,False,False,False,False,False,False,False,False,False,False
-88,acid,6,System / Metadata,,etl_staged,False,False,False,False,False,False,False,False,False,False,False,False
-89,blv,3,Configuration,,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
-90,eai,3,Configuration,,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
-91,pack,3,Configuration,,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
-92,aoai,2,Kinematics,DEG,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
-93,aoac,2,Kinematics,DEG,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
-94,bal1,2,Kinematics,FEET,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
-95,apuf,3,Configuration,,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
-96,tocw,3,Configuration,,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
-97,bal2,2,Kinematics,FEET,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
-98,wshr,3,Configuration,,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
-99,wow,3,Configuration,,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
-100,n2_1,4,Propulsion,%RPM,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
-101,n2_2,4,Propulsion,%RPM,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
-102,n2_3,4,Propulsion,%RPM,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
-103,n2_4,4,Propulsion,%RPM,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
-104,tat,2,Kinematics,DEG,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
-105,sat,2,Kinematics,DEG,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
-106,n1t,5,Guidance,%RPM,etl_staged,True,True,True,True,True,True,True,True,False,True,True,True
-107,n1c,5,Guidance,%RPM,etl_staged,True,True,True,True,True,True,True,True,False,True,True,True
-108,rudd,3,Configuration,DEG,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
-109,fqty_3,4,Propulsion,LSB,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
-110,oip_1,4,Propulsion,PSI,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
-111,oip_2,4,Propulsion,PSI,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
-112,fqty_4,4,Propulsion,LSB,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
-113,crss,5,Guidance,DEG,etl_staged,True,True,True,True,True,True,True,True,False,True,True,True
-114,hdgs,5,Guidance,DEG,etl_staged,True,True,True,True,True,True,True,True,False,True,True,True
-115,alts,2,Kinematics,FEET,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
-116,snap,6,System / Metadata,,etl_staged,True,True,True,True,True,True,True,True,True,False,True,True
-117,cass,2,Kinematics,KNOTS,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
-118,n1co,5,Guidance,,etl_staged,True,True,True,True,True,True,True,True,False,True,True,True
-119,vsps,5,Guidance,FT/MIN,etl_staged,True,True,True,True,True,True,True,True,False,True,True,True
-120,mns,5,Guidance,MMACH,etl_staged,True,True,True,True,True,True,True,True,False,True,True,True
-121,msqt_1,3,Configuration,,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
-122,vmode,5,Guidance,,etl_staged,True,True,True,True,True,True,True,True,False,True,True,True
-123,lmod,5,Guidance,,etl_staged,True,True,True,True,True,True,True,True,False,True,True,True
-124,a_t,5,Guidance,,etl_staged,True,True,True,True,True,True,True,True,False,True,True,True
-125,ccpc,3,Configuration,COUNTS,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
-126,ccpf,3,Configuration,COUNTS,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
-127,rudp,3,Configuration,COUNTS,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
-128,cwpc,3,Configuration,COUNTS,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
-129,cwpf,3,Configuration,COUNTS,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
-130,oip_3,4,Propulsion,PSI,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
-131,oip_4,4,Propulsion,PSI,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
-132,loc,5,Guidance,DDM,etl_staged,True,True,True,True,True,True,True,True,False,True,True,True
-133,gls,5,Guidance,DDM,etl_staged,True,True,True,True,True,True,True,True,False,True,True,True
-134,lonp,2,Kinematics,DEG,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
-135,abrk,3,Configuration,DEG,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
-136,ail_1,3,Configuration,DEG,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
-137,ail_2,3,Configuration,DEG,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
-138,spl_1,3,Configuration,DEG,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
-139,spl_2,3,Configuration,DEG,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
-140,esn_4,4,Propulsion,UNITS,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
-141,ecyc_1,4,Propulsion,HOURS,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
-142,ecyc_2,4,Propulsion,HOURS,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
-143,elev_1,3,Configuration,DEG,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
-144,elev_2,3,Configuration,DEG,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
-145,flap,3,Configuration,COUNTS,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
-146,ptrm,3,Configuration,DEG,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
-147,hf1,5,Guidance,,etl_staged,True,True,True,True,True,True,True,True,False,True,True,True
-148,hf2,5,Guidance,,etl_staged,True,True,True,True,True,True,True,True,False,True,True,True
-149,smkb,3,Configuration,,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
-150,sply,3,Configuration,,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
-151,splg,3,Configuration,,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
-152,frmc,6,System / Metadata,,etl_staged,True,True,True,True,True,True,True,True,True,False,True,True
-153,dver_2,6,System / Metadata,,etl_staged,False,False,False,False,False,False,False,False,False,False,False,False
-154,esn_3,4,Propulsion,UNITS,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
-155,bpgr_1,3,Configuration,PSI,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
-156,bpgr_2,3,Configuration,PSI,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
-157,bpyr_1,3,Configuration,PSI,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
-158,bpyr_2,3,Configuration,PSI,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
-159,ecyc_3,4,Propulsion,HOURS,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
-160,ecyc_4,4,Propulsion,HOURS,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
-161,ehrs_1,4,Propulsion,HOURS,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
-162,tcas,5,Guidance,,etl_staged,True,True,True,True,True,True,True,True,False,True,True,True
-163,gpws,3,Configuration,,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
-164,tmag,2,Kinematics,,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
-165,tai,3,Configuration,,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
-166,wai_1,3,Configuration,,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
-167,wai_2,3,Configuration,,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
-168,dwpt,5,Guidance,,etl_staged,True,True,True,True,True,True,True,True,False,True,True,True
-169,oipl,4,Propulsion,,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
-170,fadf,4,Propulsion,,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
-171,fads,4,Propulsion,,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
-172,ehrs_4,4,Propulsion,HOURS,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
-173,ehrs_3,4,Propulsion,HOURS,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
-174,ehrs_2,4,Propulsion,HOURS,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
-175,tmode,5,Guidance,,etl_staged,True,True,True,True,True,True,True,True,False,True,True,True
-176,aten,5,Guidance,,etl_staged,True,True,True,True,True,True,True,True,False,True,True,True
-177,latp,2,Kinematics,DEG,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
-178,fire_1,3,Configuration,,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
-179,fire_2,3,Configuration,,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
-180,fire_3,3,Configuration,,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
-181,fire_4,3,Configuration,,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
-182,fgc3,5,Guidance,,etl_staged,True,True,True,True,True,True,True,True,False,True,True,True
-183,ilsf,5,Guidance,,etl_staged,True,True,True,True,True,True,True,True,False,True,True,True
-184,esn_1,4,Propulsion,UNITS,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
-185,esn_2,4,Propulsion,UNITS,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
+0,VAR_1107,6,System / Metadata,<units>,etl_staged,True,True,True,True,True,True,True,True,True,False,True,True
+1,VAR_2670,6,System / Metadata,<units>,etl_staged,True,True,True,True,True,True,True,True,True,False,True,True
+2,VAR_5107,6,System / Metadata,<units>,etl_staged,True,True,True,True,True,True,True,True,True,False,True,True
+3,VAR_6670,6,System / Metadata,<units>,etl_staged,True,True,True,True,True,True,True,True,True,False,True,True
+4,FPAC,1,Dynamics,G,etl_staged,False,True,False,True,False,True,True,True,True,True,True,True
+5,BLAC,1,Dynamics,G,etl_staged,False,True,False,True,False,True,True,True,True,True,True,True
+6,CTAC,1,Dynamics,G,etl_staged,False,True,False,True,False,True,True,True,True,True,True,True
+7,TH,2,Kinematics,DEG,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
+8,MH,2,Kinematics,DEG,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
+9,EGT_1,4,Propulsion,DEG,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
+10,EGT_2,4,Propulsion,DEG,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
+11,EGT_3,4,Propulsion,DEG,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
+12,EGT_4,4,Propulsion,DEG,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
+13,IVV,2,Kinematics,FT/MIN,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
+14,GS,1,Dynamics,KNOTS,etl_staged,True,True,True,True,False,True,True,True,True,True,True,True
+15,TRK,2,Kinematics,DEG,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
+16,TRKM,2,Kinematics,DEG,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
+17,DA,2,Kinematics,DEG,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
+18,POVT,4,Propulsion,N/A,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
+19,WS,2,Kinematics,KNOTS,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
+20,MW,3,Configuration,N/A,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
+21,DFGS,5,Guidance,N/A,etl_staged,True,True,True,True,True,True,True,True,False,True,True,True
+22,WD,2,Kinematics,DEG,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
+23,ALT,2,Kinematics,FEET,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
+24,NSQT,3,Configuration,N/A,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
+25,RALT,2,Kinematics,FEET,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
+26,ALTR,2,Kinematics,FT/MIN,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
+27,FQTY_1,4,Propulsion,LBS,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
+28,OIT_1,4,Propulsion,DEG,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
+29,OIT_2,4,Propulsion,DEG,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
+30,AOA1,2,Kinematics,DEG,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
+31,AOA2,2,Kinematics,DEG,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
+32,PTCH,2,Kinematics,DEG,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
+33,FF_1,4,Propulsion,LBS/HR,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
+34,PSA,2,Kinematics,MB,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
+35,FF_2,4,Propulsion,LBS/HR,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
+36,FF_3,4,Propulsion,LBS/HR,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
+37,ROLL,2,Kinematics,DEG,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
+38,FF_4,4,Propulsion,LBS/HR,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
+39,N1_1,4,Propulsion,%RPM,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
+40,N1_2,4,Propulsion,%RPM,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
+41,MACH,2,Kinematics,MACH,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
+42,CAS,2,Kinematics,KNOTS,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
+43,APFD,5,Guidance,N/A,etl_staged,True,True,True,True,True,True,True,True,False,True,True,True
+44,PH,6,System / Metadata,N/A,etl_staged,True,True,True,True,True,True,True,True,True,False,True,True
+45,CASM,2,Kinematics,KNOTS,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
+46,TAS,2,Kinematics,KNOTS,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
+47,VRTG,1,Dynamics,G,etl_staged,False,True,False,True,False,True,True,True,True,True,True,True
+48,LATG,1,Dynamics,G,etl_staged,False,True,False,True,False,True,True,True,True,True,True,True
+49,PI,2,Kinematics,MB,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
+50,PS,2,Kinematics,IN,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
+51,N1_3,4,Propulsion,%RPM,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
+52,EVNT,6,System / Metadata,N/A,etl_staged,True,True,True,True,True,True,True,True,True,False,True,True
+53,MRK,5,Guidance,N/A,etl_staged,True,True,True,True,True,True,True,True,False,True,True,True
+54,VIB_1,4,Propulsion,IN/SEC,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
+55,PT,2,Kinematics,MB,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
+56,VHF1,5,Guidance,N/A,etl_staged,True,True,True,True,True,True,True,True,False,True,True,True
+57,VHF2,5,Guidance,N/A,etl_staged,True,True,True,True,True,True,True,True,False,True,True,True
+58,LGDN,3,Configuration,N/A,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
+59,LGUP,3,Configuration,N/A,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
+60,VIB_2,4,Propulsion,IN/SEC,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
+61,VHF3,5,Guidance,N/A,etl_staged,True,True,True,True,True,True,True,True,False,True,True,True
+62,PUSH,3,Configuration,N/A,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
+63,SHKR,3,Configuration,N/A,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
+64,MSQT_2,3,Configuration,N/A,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
+65,VIB_3,4,Propulsion,IN/SEC,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
+66,LONG,1,Dynamics,G,etl_staged,False,True,False,True,False,True,True,True,True,True,True,True
+67,PLA_1,3,Configuration,DEG,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
+68,N1_4,4,Propulsion,%RPM,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
+69,HYDY,3,Configuration,N/A,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
+70,HYDG,3,Configuration,N/A,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
+71,SMOK,3,Configuration,N/A,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
+72,CALT,2,Kinematics,N/A,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
+73,VIB_4,4,Propulsion,IN/SEC,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
+74,PLA_2,3,Configuration,DEG,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
+75,PLA_3,3,Configuration,DEG,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
+76,PLA_4,3,Configuration,DEG,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
+77,GMT_HOUR,6,System / Metadata,Hour,etl_staged,True,True,True,True,True,True,True,True,True,False,True,True
+78,GMT_MINUTE,6,System / Metadata,Minute,etl_staged,True,True,True,True,True,True,True,True,True,False,True,True
+79,GMT_SEC,6,System / Metadata,Second,etl_staged,True,True,True,True,True,True,True,True,True,False,True,True
+80,ACMT,6,System / Metadata,N/A,etl_staged,True,True,True,True,True,True,True,True,True,False,True,True
+81,FQTY_2,4,Propulsion,LSB,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
+82,OIT_3,4,Propulsion,DEG,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
+83,OIT_4,4,Propulsion,DEG,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
+84,DATE_YEAR,6,System / Metadata,Year,etl_staged,True,True,True,True,True,True,True,True,True,False,True,True
+85,DATE_MONTH,6,System / Metadata,Month,etl_staged,True,True,True,True,True,True,True,True,True,False,True,True
+86,DATE_DAY,6,System / Metadata,Day,etl_staged,True,True,True,True,True,True,True,True,True,False,True,True
+87,DVER_1,6,System / Metadata,N/A,etl_staged,True,True,True,True,True,True,True,True,True,False,True,True
+88,ACID,6,System / Metadata,N/A,etl_staged,True,True,True,True,True,True,True,True,True,False,True,True
+89,BLV,3,Configuration,N/A,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
+90,EAI,3,Configuration,N/A,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
+91,PACK,3,Configuration,N/A,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
+92,AOAI,2,Kinematics,DEG,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
+93,AOAC,2,Kinematics,DEG,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
+94,BAL1,2,Kinematics,FEET,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
+95,APUF,3,Configuration,N/A,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
+96,TOCW,3,Configuration,N/A,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
+97,BAL2,2,Kinematics,FEET,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
+98,WSHR,3,Configuration,N/A,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
+99,WOW,3,Configuration,N/A,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
+100,N2_1,4,Propulsion,%RPM,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
+101,N2_2,4,Propulsion,%RPM,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
+102,N2_3,4,Propulsion,%RPM,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
+103,N2_4,4,Propulsion,%RPM,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
+104,TAT,2,Kinematics,DEG,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
+105,SAT,2,Kinematics,DEG,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
+106,N1T,5,Guidance,%RPM,etl_staged,True,True,True,True,True,True,True,True,False,True,True,True
+107,N1C,5,Guidance,%RPM,etl_staged,True,True,True,True,True,True,True,True,False,True,True,True
+108,RUDD,3,Configuration,DEG,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
+109,FQTY_3,4,Propulsion,LSB,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
+110,OIP_1,4,Propulsion,PSI,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
+111,OIP_2,4,Propulsion,PSI,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
+112,FQTY_4,4,Propulsion,LSB,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
+113,CRSS,5,Guidance,DEG,etl_staged,True,True,True,True,True,True,True,True,False,True,True,True
+114,HDGS,5,Guidance,DEG,etl_staged,True,True,True,True,True,True,True,True,False,True,True,True
+115,ALTS,2,Kinematics,FEET,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
+116,SNAP,6,System / Metadata,N/A,etl_staged,True,True,True,True,True,True,True,True,True,False,True,True
+117,CASS,2,Kinematics,KNOTS,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
+118,N1CO,5,Guidance,N/A,etl_staged,True,True,True,True,True,True,True,True,False,True,True,True
+119,VSPS,5,Guidance,FT/MIN,etl_staged,True,True,True,True,True,True,True,True,False,True,True,True
+120,MNS,5,Guidance,MMACH,etl_staged,True,True,True,True,True,True,True,True,False,True,True,True
+121,MSQT_1,3,Configuration,N/A,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
+122,VMODE,5,Guidance,N/A,etl_staged,True,True,True,True,True,True,True,True,False,True,True,True
+123,LMOD,5,Guidance,N/A,etl_staged,True,True,True,True,True,True,True,True,False,True,True,True
+124,A_T,5,Guidance,N/A,etl_staged,True,True,True,True,True,True,True,True,False,True,True,True
+125,CCPC,3,Configuration,COUNTS,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
+126,CCPF,3,Configuration,COUNTS,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
+127,RUDP,3,Configuration,COUNTS,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
+128,CWPC,3,Configuration,COUNTS,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
+129,CWPF,3,Configuration,COUNTS,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
+130,OIP_3,4,Propulsion,PSI,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
+131,OIP_4,4,Propulsion,PSI,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
+132,LOC,5,Guidance,DDM,etl_staged,True,True,True,True,True,True,True,True,False,True,True,True
+133,GLS,5,Guidance,DDM,etl_staged,True,True,True,True,True,True,True,True,False,True,True,True
+134,LONP,2,Kinematics,DEG,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
+135,ABRK,3,Configuration,DEG,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
+136,AIL_1,3,Configuration,DEG,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
+137,AIL_2,3,Configuration,DEG,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
+138,SPL_1,3,Configuration,DEG,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
+139,SPL_2,3,Configuration,DEG,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
+140,ESN_4,4,Propulsion,UNITS,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
+141,ECYC_1,4,Propulsion,HOURS,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
+142,ECYC_2,4,Propulsion,HOURS,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
+143,ELEV_1,3,Configuration,DEG,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
+144,ELEV_2,3,Configuration,DEG,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
+145,FLAP,3,Configuration,COUNTS,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
+146,PTRM,3,Configuration,DEG,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
+147,HF1,5,Guidance,N/A,etl_staged,True,True,True,True,True,True,True,True,False,True,True,True
+148,HF2,5,Guidance,N/A,etl_staged,True,True,True,True,True,True,True,True,False,True,True,True
+149,SMKB,3,Configuration,N/A,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
+150,SPLY,3,Configuration,N/A,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
+151,SPLG,3,Configuration,N/A,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
+152,FRMC,6,System / Metadata,N/A,etl_staged,True,True,True,True,True,True,True,True,True,False,True,True
+153,DVER_2,6,System / Metadata,N/A,etl_staged,True,True,True,True,True,True,True,True,True,False,True,True
+154,ESN_3,4,Propulsion,UNITS,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
+155,BPGR_1,3,Configuration,PSI,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
+156,BPGR_2,3,Configuration,PSI,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
+157,BPYR_1,3,Configuration,PSI,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
+158,BPYR_2,3,Configuration,PSI,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
+159,ECYC_3,4,Propulsion,HOURS,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
+160,ECYC_4,4,Propulsion,HOURS,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
+161,EHRS_1,4,Propulsion,HOURS,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
+162,TCAS,5,Guidance,N/A,etl_staged,True,True,True,True,True,True,True,True,False,True,True,True
+163,GPWS,3,Configuration,N/A,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
+164,TMAG,2,Kinematics,N/A,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
+165,TAI,3,Configuration,N/A,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
+166,WAI_1,3,Configuration,N/A,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
+167,WAI_2,3,Configuration,N/A,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
+168,DWPT,5,Guidance,N/A,etl_staged,True,True,True,True,True,True,True,True,False,True,True,True
+169,OIPL,4,Propulsion,N/A,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
+170,FADF,4,Propulsion,N/A,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
+171,FADS,4,Propulsion,N/A,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
+172,EHRS_4,4,Propulsion,HOURS,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
+173,EHRS_3,4,Propulsion,HOURS,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
+174,EHRS_2,4,Propulsion,HOURS,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
+175,TMODE,5,Guidance,N/A,etl_staged,True,True,True,True,True,True,True,True,False,True,True,True
+176,ATEN,5,Guidance,N/A,etl_staged,True,True,True,True,True,True,True,True,False,True,True,True
+177,LATP,2,Kinematics,DEG,etl_staged,True,True,True,True,True,False,True,True,True,True,True,True
+178,FIRE_1,3,Configuration,N/A,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
+179,FIRE_2,3,Configuration,N/A,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
+180,FIRE_3,3,Configuration,N/A,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
+181,FIRE_4,3,Configuration,N/A,etl_staged,True,True,True,True,True,True,False,True,True,True,True,True
+182,FGC3,5,Guidance,N/A,etl_staged,True,True,True,True,True,True,True,True,False,True,True,True
+183,ILSF,5,Guidance,N/A,etl_staged,True,True,True,True,True,True,True,True,False,True,True,True
+184,ESN_1,4,Propulsion,UNITS,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
+185,ESN_2,4,Propulsion,UNITS,etl_staged,True,True,True,True,True,True,True,False,True,True,True,True
 186,p,7,Accelerations / Rates,rad/s,acc_staged,True,True,True,True,True,True,True,True,True,True,False,True
 187,q,7,Accelerations / Rates,rad/s,acc_staged,True,True,True,True,True,True,True,True,True,True,False,True
 188,r,7,Accelerations / Rates,rad/s,acc_staged,True,True,True,True,True,True,True,True,True,True,False,True
 189,p_dot,7,Accelerations / Rates,rad/s²,acc_staged,False,True,False,True,True,True,True,True,True,True,False,True
 190,q_dot,7,Accelerations / Rates,rad/s²,acc_staged,False,True,False,True,True,True,True,True,True,True,False,True
 191,r_dot,7,Accelerations / Rates,rad/s²,acc_staged,False,True,False,True,True,True,True,True,True,True,False,True
-192,res_energy_rate,8,Physics_Residuals,W/kg,piml_staged,False,False,True,True,True,True,True,True,True,True,True,False
-193,res_flight_path,8,Physics_Residuals,rad,piml_staged,False,False,True,True,True,True,True,True,True,True,True,False
-194,res_side_force,8,Physics_Residuals,N,piml_staged,False,False,True,True,True,True,True,True,True,True,True,False
-195,stabilized_phases,6,System / Metadata,,fsm_staged,True,True,True,True,True,True,True,True,True,False,True,True
+192,res_energy_rate,8,Physics_Residuals,ft/s,piml_staged,False,False,True,True,True,True,True,True,True,True,True,False
+193,res_flight_path,8,Physics_Residuals,ft/s,piml_staged,False,False,True,True,True,True,True,True,True,True,True,False
+194,res_side_force,8,Physics_Residuals,g,piml_staged,False,False,True,True,True,True,True,True,True,True,True,False
+195,vspd_fps,8,Physics_Residuals,ft/s,piml_staged,False,False,True,True,True,True,True,True,True,True,True,False
+196,vt_dot,8,Physics_Residuals,ft/s²,piml_staged,False,False,True,True,True,True,True,True,True,True,True,False
+197,alpha_est,8,Physics_Residuals,deg,piml_staged,False,False,True,True,True,True,True,True,True,True,True,False
+198,res_flight_path_ae,8,Physics_Residuals,ft/s,piml_staged,False,False,True,True,True,True,True,True,True,True,True,False
+199,res_energy_rate_no_k3,8,Physics_Residuals,ft/s,piml_staged,False,False,True,True,True,True,True,True,True,True,True,False
+200,fractional_ttg,8,Physics_Residuals,norm,piml_staged,False,False,True,True,True,True,True,True,True,True,True,False
+201,absolute_ttg_sec,8,Physics_Residuals,s,piml_staged,False,False,True,True,True,True,True,True,True,True,True,False
+202,res_nz,8,Physics_Residuals,g,piml_staged,False,False,True,True,True,True,True,True,True,True,True,False

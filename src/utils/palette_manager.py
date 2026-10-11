@@ -3,10 +3,9 @@ from matplotlib.colors import LinearSegmentedColormap
 
 
 class PaletteManager:
-    """Centralized Okabe-Ito palette and layout constants for praxis/publication figures.
+    """Centralized Okabe-Ito palette, layout constants, and typography settings
 
-    Imports cleanly into existing standalone plotting functions without
-    forcing structural refactoring.
+    for praxis/publication figures.
     """
 
     # Okabe-Ito Colorblind-Friendly Palette (8-color standard)
@@ -23,6 +22,12 @@ class PaletteManager:
 
     # Distinct Accent for Threshold / Anomaly Overlays
     CRIMSON = "#B22222"  # Firebrick Crimson for E(t) overlays & anomaly fills
+
+    # Typography & Axis Colors for High-Contrast Publication Graphics
+    TEXT_COLOR = "#000000"       # General text & tick labels
+    LABEL_COLOR = "#000000"      # Axis titles (xlabel / ylabel)
+    TITLE_COLOR = "#000000"      # Plot / Subplot headers
+    GRID_COLOR = "#E0E0E0"       # Subtle gridlines
 
     # Layout & Page Geometry (Optimized for 8.5" x 11" Portrait / Quarto)
     PAGE_WIDTH_INCHES = 7.0  # Printable width with 0.75" margins
@@ -44,7 +49,7 @@ class PaletteManager:
 
     @classmethod
     def apply_publication_style(cls, style="seaborn-v0_8-whitegrid"):
-        """Sets standard matplotlibrc context for clean Quarto PDF exports."""
+        """Sets standard matplotlibrc context for clean Quarto PDF/Word exports."""
         plt.style.use(style)
         plt.rcParams.update({
             "font.size": 9,
@@ -56,6 +61,15 @@ class PaletteManager:
             "figure.titlesize": 11,
             "savefig.dpi": cls.DPI,
             "figure.autolayout": False,
+            
+            # Global Typography High-Contrast Color Overrides
+            "text.color": cls.TEXT_COLOR,
+            "axes.labelcolor": cls.LABEL_COLOR,
+            "axes.titlecolor": cls.TITLE_COLOR,
+            "xtick.color": cls.TEXT_COLOR,
+            "ytick.color": cls.TEXT_COLOR,
+            "axes.edgecolor": cls.TEXT_COLOR,
+            "grid.color": cls.GRID_COLOR,
         })
 
 
