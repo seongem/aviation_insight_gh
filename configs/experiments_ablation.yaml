@@ -1,0 +1,86 @@
+experiment_tag: ablation_study
+defaults:
+  batch_size: 512
+  learning_rate: 0.0001
+  weight_decay: 0.00001
+  epochs: 50
+  num_workers: 4
+  seed: 42
+  patience: 10
+  patience_delta: 0.0005
+
+data_fractions:
+  #  - 0.25
+  #  - 0.50
+  #  - 0.75
+   - 1.0
+
+# Feature sets to sweep from features.csv
+feature_masks:
+  - enabled_all
+
+# Optional LOGO configurations
+logo_masks:
+  train_time:
+    - logo_drop_g1_dynamics
+    - logo_drop_g2_kinematics
+    - logo_drop_g3_configuration
+    - logo_drop_g4_propulsion
+    - logo_drop_g5_guidance
+    - logo_drop_g6_system___metadata
+    - logo_drop_g7_accelerations___rates
+    - logo_drop_g8_physics_residuals
+
+  inference_time:
+    - logo_drop_g1_dynamics
+    - logo_drop_g2_kinematics
+    - logo_drop_g3_configuration
+    - logo_drop_g4_propulsion
+    - logo_drop_g5_guidance
+    - logo_drop_g6_system___metadata
+    - logo_drop_g7_accelerations___rates
+    - logo_drop_g8_physics_residuals
+
+# Models to train
+models:
+  patchtst:
+    patch_len: 16
+    stride: 8
+    e_layers: 3
+    n_heads: 4
+    d_model: 64
+    epochs: 50
+
+  ts2vec:
+    output_dims: 320
+    hidden_dims: 64
+    depth: 10
+    k: 5
+    epochs: 50
+    normalize_embeddings: false
+
+  omni:
+    latent_dim: 4
+    rnn_hidden: 64
+    epochs: 50
+
+  anomaly_transformer:
+    d_model: 128
+    n_heads: 8
+    e_layers: 3
+    d_ff: 256
+    dropout: 0.1
+    k_lambda: 3.0
+    epochs: 25            # Lower epoch count for dual-pass minimax training
+
+  lstm_vae:
+    hidden_dim: 128
+    latent_dim: 32
+    num_layers: 2
+    dropout: 0.1
+    beta: 1.0
+    epochs: 50
+
+  conv_ae:
+    learning_rate: 0.001
+    epochs: 50

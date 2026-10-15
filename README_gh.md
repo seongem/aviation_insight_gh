@@ -3,8 +3,8 @@
 ## 📌 Overview
 
 This project evaluates multiple anomaly detection models against flight telemetry data to improve safety and operational insights. This repository
-repository partially represents the code used as part of praxis study. Additionally, it provides some reference material about different aspects of
-the analysis.
+partially represents the code used as part of praxis study. Additionally, it provides some reference material about different aspects of
+the analysis in the Reference papers sectin below.
 
 ## Citation
 

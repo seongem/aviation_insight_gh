@@ -95,7 +95,7 @@ class AviationFourClassDataset(Dataset):
 
         logger.info(
             f"✅ AviationFourClassDataset Initialized [{split.upper()}] | "
-            f"Active Features: {self.num_channels}/31 | "
+            f"Active Features: {self.num_channels}/{len(self.features_df)} | "
             f"Instances: {len(self.active_instances):,} | "
             f"Phase ID: {self.phase_filter} (Approach)"
         )

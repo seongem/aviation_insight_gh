@@ -33,6 +33,8 @@ class PaletteManager:
     PAGE_WIDTH_INCHES = 7.0  # Printable width with 0.75" margins
     DPI = 300
 
+    okabe_continuous = LinearSegmentedColormap.from_list( "okabe_extended", OKABE_ITO)
+
     def __init__(self):
         # Pre-configured continuous colormaps for heatmaps/confusion matrices
         self.cmap_blue = LinearSegmentedColormap.from_list(
@@ -41,6 +43,8 @@ class PaletteManager:
         self.cmap_vermilion = LinearSegmentedColormap.from_list(
             "okabe_vermilion", ["#FAFAFA", "#D55E00"]
         )
+
+
 
     @classmethod
     def get_sensor_color(cls, idx: int) -> str:
