@@ -213,6 +213,182 @@ def display_and_save_confusion_matrices(results_dict, output_dir, mask_name, max
     logger.info("Saved heatmaps for [%s] to: %s", mask_name, save_path)
     plt.close()
 
+# -------------------------------------------------------------------------
+# 3. Helper: Attribution Audit Script
+# -------------------------------------------------------------------------
+def save_grouped_attribution_audit(model_name: str, res, feature_names, output_dir, run_identifier):
+    """
+    Aggregates gradient-based sensor attributions into logical feature groups 
+    by reading exact group assignments directly from features.csv.
+    """
+    attributions = res.get("sensor_attributions", None)
+    y_true = res.get("y_true", None)
+    
+    if attributions is None or len(attributions) == 0 or feature_names is None:
+        return
+
+    df_attr = pd.DataFrame(attributions, columns=feature_names)
+    df_attr["True_Anomaly"] = y_true
+
+    # Load exact group mappings from features.csv manifest
+    group_mapping = {}
+    try:
+        manifest_path = Path("manifests/features.csv") # Adjust path if needed
+        if not manifest_path.exists():
+            manifest_path = Path("../manifests/features.csv")
+            
+        if manifest_path.exists():
+            feat_df = pd.read_csv(manifest_path)
+            # Assuming columns are 'feature_name' and a group column (e.g., 'group' or similar)
+            # Let's fallback gracefully if column names differ
+            group_col = next((col for col in ['group', 'logo_group', 'category'] if col in feat_df.columns), None)
+            if group_col:
+                group_mapping = dict(zip(feat_df['feature_name'], feat_df[group_col]))
+    except Exception as e:
+        logger.warning(f"Could not load features.csv for attribution grouping: {e}")
+
+    # Fallback mapper if features.csv couldn't be read directly
+    def map_feature_to_group(feat_name):
+        if feat_name in group_mapping:
+            return group_mapping[feat_name]
+            
+        # Exact fallback dictionary based on your feature manifest groups
+        feat_lower = feat_name.lower()
+        
+        # Group 1: Dynamics
+        if any(k in feat_lower for k in ['aileron position lh', 'aileron position rh', 'corrected angle of attack', 'elevator position left', 'pitch angle lsp', 'roll angle lsp', 'rudder position', 'alpha_est']):
+            return "G1: Dynamics"
+        # Group 2: Kinematics
+        elif any(k in feat_lower for k in ['baro correct altitude lsp', 'computed airspeed lsp', 'drift angle', 'total pressure lsp', 'true heading lsp', 'wind speed']):
+            return "G2: Kinematics"
+        # Group 3: Configuration
+        elif 'flap' in feat_lower:
+            return "G3: Configuration"
+        # Group 4: Propulsion
+        elif any(k in feat_lower for k in ['core speed avg', 'n1', 'n2', 'thrust']):
+            return "G4: Propulsion"
+        # Group 5: Guidance
+        elif any(k in feat_lower for k in ['course', 'heading', 'glideslope', 'localizer']):
+            return "G5: Guidance"
+        # Group 6: System / Metadata (Includes TTG)
+        elif any(k in feat_lower for k in ['ttg', 'fractional_ttg', 'absolute_ttg_sec']):
+            return "G6: System / Metadata"
+        # Group 7: Accelerations / Rates
+        elif any(k in feat_lower for k in ['vertical acceleration', 'p_dot', 'q_dot', 'r_dot']) or feat_lower in ['p', 'q', 'r']:
+            return "G7: Accelerations / Rates"
+        # Group 8: Physics Residuals
+        elif 'res_' in feat_lower or 'vspd_fps' in feat_lower or 'vt_dot' in feat_lower:
+            return "G8: Physics Residuals"
+        else:
+            return "G6: System / Metadata"
+
+    col_group_mapping = {col: map_feature_to_group(col) for col in feature_names}
+    df_grouped = df_attr[feature_names].rename(columns=col_group_mapping)
+    df_grouped = df_grouped.T.groupby(level=0).mean().T
+    df_grouped["True_Anomaly"] = y_true
+
+    mean_group_attr = df_grouped.groupby("True_Anomaly").mean().T
+    mean_group_attr.columns = ["Nominal (0)", "Anomaly (1)"]
+
+# 2. Add delta and ratio columns for downstream analysis
+    mean_group_attr["Delta"] = mean_group_attr["Anomaly (1)"] - mean_group_attr["Nominal (0)"]
+    mean_group_attr["Ratio"] = mean_group_attr["Anomaly (1)"] / (mean_group_attr["Nominal (0)"] + 1e-9)
+
+    # 3. Save CSV alongside the plot image with identical filename base
+    os.makedirs(output_dir, exist_ok=True)
+    model_str = model_name.lower().replace(" ", "_")
+    csv_save_path = os.path.join(output_dir, f"attribution_audit_{model_str}_{run_identifier}.csv")
+    mean_group_attr.to_csv(csv_save_path)
+    logger.info("Saved attribution audit CSV data to: %s", csv_save_path)
+
+# --- Apply Local Min-Max Scaling per Model Plot ---
+    min_val = mean_group_attr.min().min()
+    max_val = mean_group_attr.max().max()
+    if max_val > min_val:
+        mean_attr_scaled = (mean_group_attr - min_val) / (max_val - min_val)
+    else:
+        mean_attr_scaled = mean_group_attr
+
+    # Plotting using theme colormap and width constraints
+    fig, ax = plt.subplots(figsize=(9, 5), dpi=theme.DPI)
+    sns.heatmap(
+        mean_attr_scaled, 
+        annot=True, 
+        fmt=".4f", 
+        cmap=theme.cmap_blue, 
+        cbar=True,
+        ax=ax,
+        annot_kws={"size": 9, "weight": "bold"}
+    )
+    model_str = model_name.lower().replace(" ", "_")
+    ax.set_title(f"Feature-Group Attribution Audit — {model_str} {run_identifier}", fontsize=11, fontweight="bold")
+    ax.set_xlabel("Ground Truth Class", fontsize=9, fontweight="bold")
+    ax.set_ylabel("Logical Feature Group (LOGO)", fontsize=9, fontweight="bold")
+    
+    plt.tight_layout()
+    os.makedirs(output_dir, exist_ok=True)
+    
+    save_path = os.path.join(output_dir, f"grouped_attribution_{model_str}_{run_identifier}.png")
+    plt.savefig(save_path, dpi=theme.DPI, bbox_inches="tight")
+    plt.close()
+    logger.info("Saved grouped attribution audit plot to: %s", save_path)
+
+
+def save_attribution_audit_plot(model_name: str, res, feature_names, output_dir, run_identifier):
+    """Aggregates and saves attribution audit heatmap per model run."""
+    attributions = res.get("sensor_attributions", None)
+    y_true = res.get("y_true", None)
+    
+    if attributions is None or len(attributions) == 0 or feature_names is None:
+        return
+
+    df_attr = pd.DataFrame(attributions, columns=feature_names)
+    df_attr["True_Anomaly"] = y_true
+    
+    # Group by ground truth (Nominal vs Anomaly) or anomaly class
+    mean_attr = df_attr.groupby("True_Anomaly")[feature_names].mean().T
+    mean_attr.columns = ["Nominal (0)", "Anomaly (1)"]
+
+    # 2. Add delta and ratio columns for downstream analysis
+    mean_attr["Delta"] = mean_attr["Anomaly (1)"] - mean_attr["Nominal (0)"]
+    mean_attr["Ratio"] = mean_attr["Anomaly (1)"] / (mean_attr["Nominal (0)"] + 1e-9)
+
+    # 3. Save CSV alongside the plot image with identical filename base
+    os.makedirs(output_dir, exist_ok=True)
+    model_str = model_name.lower().replace(" ", "_")
+    csv_save_path = os.path.join(output_dir, f"attribution_audit_{model_str}_{run_identifier}.csv")
+    mean_attr.to_csv(csv_save_path)
+    logger.info("Saved attribution audit CSV data to: %s", csv_save_path)
+
+    # --- Apply Local Min-Max Scaling per Model Plot ---
+    min_val = mean_attr.min().min()
+    max_val = mean_attr.max().max()
+    if max_val > min_val:
+        mean_attr_scaled = (mean_attr - min_val) / (max_val - min_val)
+    else:
+        mean_attr_scaled = mean_attr
+
+    plt.figure(figsize=(8, max(5, len(feature_names) * 0.25)), dpi=150)
+    sns.heatmap(
+        mean_attr_scaled, 
+        annot=True, 
+        fmt=".3f", 
+        cmap=theme.cmap_blue, 
+        cbar=True,
+        annot_kws={"size": 8}
+    )
+    model_str = model_name.lower().replace(" ", "_")
+    plt.title(f"Sensor Attribution Audit — {model_str} {run_identifier}", fontsize=10, fontweight="bold")
+    plt.xlabel("Ground Truth Class", fontsize=9)
+    plt.ylabel("Sensor / Feature Name", fontsize=9)
+    plt.tight_layout()
+    
+    os.makedirs(output_dir, exist_ok=True)
+    
+    save_path = os.path.join(output_dir, f"attribution_audit_{model_str}_{run_identifier}.png")
+    plt.savefig(save_path, bbox_inches="tight")
+    plt.close()
+    logger.info("Saved attribution audit plot to: %s", save_path)
 
 # -------------------------------------------------------------------------
 # 3. Helper: Clean State Dict Keys & JSON Metric Reader
@@ -604,6 +780,8 @@ def main():
                             top_k=3,
                             top_n=5,
                         )
+                        save_attribution_audit_plot(model_name=model_name, res=res, feature_names=feature_names, output_dir=plots_dir, run_identifier=run_identifier)
+                        save_grouped_attribution_audit(model_name=model_name, res=res, feature_names=feature_names, output_dir=plots_dir, run_identifier=run_identifier)
                     # display for all models within this run_identifier
                     display_and_save_confusion_matrices(mask_results, output_dir=plots_dir, mask_name=run_identifier)
 

@@ -21,9 +21,9 @@ data_fractions:
 
 # Feature sets to sweep from features.csv
 feature_masks:
-  - enabled_baseline
-  - enabled_baseline_acc
-  - enabled_baseline_piml
+  # - enabled_baseline
+  # - enabled_baseline_acc
+  # - enabled_baseline_piml
   - enabled_all
 
 # Optional LOGO configurations

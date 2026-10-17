@@ -60,6 +60,32 @@ models:
     output_dims: 320
     hidden_dims: 64
     depth: 10
+models:
+  patchtst:
+    patch_len: 16
+    stride: 8
+models:
+  patchtst:
+    patch_len: 16
+    stride: 8
+    e_layers: 3
+    n_heads: 4
+    d_model: 64
+    epochs: 15
+
+  ts2vec:
+    output_dims: 320
+    hidden_dims: 64
+    depth: 10
+    e_layers: 3
+    n_heads: 4
+    d_model: 64
+    epochs: 15
+
+  ts2vec:
+    output_dims: 320
+    hidden_dims: 64
+    depth: 10
     k: 5
     epochs: 20
     normalize_embeddings: false

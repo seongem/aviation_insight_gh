@@ -358,12 +358,7 @@ def run_conv_ae_pipeline(exp_config_path: str):
     checkpoint_base_dir.mkdir(parents=True, exist_ok=True)
 
     model_cfg = exp_cfg["models"]["conv_ae"]
-    epochs = model_cfg.get("epochs", exp_cfg["defaults"].get("epochs", 30))
-    lr = float(model_cfg.get("learning_rate", exp_cfg["defaults"].get("learning_rate", 1e-3)))
-    # 1. Initialize Early Stopping before epoch loop
-    patience = exp_cfg.get("defaults", {}).get("patience", 10)
-    patience_delta = exp_cfg.get("defaults", {}).get("patience_delta", 0.0005)
-    early_stopper = EarlyStopping(patience=patience, delta=patience_delta, mode="max")
+
 
     # -------------------------------------------------------------------------
     # FEATURE MASK & TRAIN-TIME LOGO SWEEP LOOP
@@ -431,17 +426,15 @@ def run_conv_ae_pipeline(exp_config_path: str):
 
                     input_shape = (train_ds.window_size, train_ds.num_channels)
 
-                    logger.info(
-                        f"🚀 Training ConvAutoencoder on [{mask_name}] | Input Shape: {input_shape} | "
-                        f"Epochs: {epochs} | LR: {lr}"
-                    )
+ 
 
                     # 2. Instantiate ConvAutoencoder Model
                     model = ConvAutoencoder(input_shape=input_shape).to(device)
-
+                    
+                    lr= float(model_cfg.get("learning_rate", exp_cfg["defaults"].get("learning_rate", 1e-3)))
                     optimizer = torch.optim.Adam(
                         model.parameters(),
-                        lr=lr,
+                        lr= lr,
                         weight_decay=float(exp_cfg["defaults"].get("weight_decay", 1e-5)),
                     )
                     criterion = nn.MSELoss()
@@ -459,6 +452,18 @@ def run_conv_ae_pipeline(exp_config_path: str):
                     save_dir.mkdir(parents=True, exist_ok=True)
                     
                     logger.info(f"Saving checkpoints to: {save_dir}")
+
+                    epochs = model_cfg.get("epochs", exp_cfg["defaults"].get("epochs", 30))
+                    
+                    # 1. Initialize Early Stopping before epoch loop
+                    patience = exp_cfg.get("defaults", {}).get("patience", 10)
+                    patience_delta = exp_cfg.get("defaults", {}).get("patience_delta", 0.0005)
+                    early_stopper = EarlyStopping(patience=patience, delta=patience_delta, mode="max")
+
+                    logger.info(
+                        f"🚀 Training ConvAutoencoder on [{mask_name}] | Input Shape: {input_shape} | "
+                        f"Epochs: {epochs} | LR: {lr}"
+                    )
 
                     # =====================================================================
                     # Measure Static Model Complexity (Before Epoch Loop)
@@ -569,7 +574,7 @@ def run_conv_ae_pipeline(exp_config_path: str):
                                 "epoch_duration_sec": epoch_duration_sec,
                                 "throughput_samples_per_sec": throughput,
                                 "peak_vram_gb": peak_vram_gb,
-                            })
+                        })
                         # 3. Check Early Stopping Condition to Break Loop
                         if is_early_stop:
                             logger.info(f"\n✋ Early stopping triggered at Epoch {epoch:02d}. Advancing to next model...")
@@ -654,11 +659,7 @@ def run_lstm_vae_pipeline(exp_config_path: str):
     model_cfg = exp_cfg["models"]["lstm_vae"]
     beta = float(model_cfg.get("beta", 1.0))
 
-    # 1. Initialize Early Stopping before epoch loop
-    patience = exp_cfg.get("defaults", {}).get("patience", 10)
-    patience_delta = exp_cfg.get("defaults", {}).get("patience_delta", 0.0005)
-    early_stopper = EarlyStopping(patience=patience, delta=patience_delta, mode="max")
-    epochs = model_cfg.get("epochs", exp_cfg["defaults"].get("epochs", 30))
+
 
     # -------------------------------------------------------------------------
     # FEATURE MASK & TRAIN-TIME LOGO SWEEP LOOP
@@ -723,10 +724,7 @@ def run_lstm_vae_pipeline(exp_config_path: str):
                         generator=g,
                     )
 
-                    logger.info(
-                        f"🚀 Training LSTM-VAE on [{mask_name}] | Window: {train_ds.window_size} | "
-                        f"Channels: {train_ds.num_channels} | Epochs: {epochs}"
-                    )
+
 
                     # 2. Instantiate LSTM-VAE Model
                     model = LSTMVAE(
@@ -756,7 +754,17 @@ def run_lstm_vae_pipeline(exp_config_path: str):
                     save_dir.mkdir(parents=True, exist_ok=True)
                     
                     logger.info(f"Saving checkpoints to: {save_dir}")
+                    # 1. Initialize Early Stopping before epoch loop
+                    patience = exp_cfg.get("defaults", {}).get("patience", 10)
+                    patience_delta = exp_cfg.get("defaults", {}).get("patience_delta", 0.0005)
+                    early_stopper = EarlyStopping(patience=patience, delta=patience_delta, mode="max")
+                    epochs = model_cfg.get("epochs", exp_cfg["defaults"].get("epochs", 30))
 
+                    logger.info(
+                    f"🚀 Training LSTM-VAE on [{mask_name}] | Window: {train_ds.window_size} | "
+                    f"Channels: {train_ds.num_channels} | Epochs: {epochs}"
+                    )
+                    
                     # =====================================================================
                     # Measure Static Model Complexity (Before Epoch Loop)
                     # =====================================================================
